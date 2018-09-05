@@ -1,0 +1,859 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>rates.models &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="rates.serializer" href="r-serializer.html" />
+    <link rel="prev" title="rates.views" href="r-view.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="r-serializer.html" title="rates.serializer"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="r-view.html" title="rates.views"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="rates-models">
+<h1>rates.models<a class="headerlink" href="#rates-models" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>from copy import copy</p>
+<p>from django.db import models, connection
+# from django.db.models import Sum
+from django.utils import timezone</p>
+<p># from booking.urls import booking_patterns
+from cp_qb.models import QuickbooksServices
+from payments.helpers import ExchangeRateHelper
+from utils.models import DateBaseModel</p>
+<dl class="docutils">
+<dt>class ChargeDescription(DateBaseModel):</dt>
+<dd><p class="first">code = models.CharField(unique=True, max_length=8)
+description = models.CharField(max_length=1024)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.description.encode(‘utf8’, ‘ignore’))</dd>
+</dl>
+</dd>
+<dt>class Rates(DateBaseModel):</dt>
+<dd><p class="first">RATE_TYPE_SPOT = 0
+RATE_TYPE_CONTRACT = 1</p>
+<dl class="docutils">
+<dt>RATE_TYPE_CHOICES = (</dt>
+<dd>(RATE_TYPE_SPOT, ‘spot’),
+(RATE_TYPE_CONTRACT, ‘contract’)</dd>
+</dl>
+<p>)
+is_return = models.BooleanField(default=False)
+provider_rate = models.PositiveIntegerField(verbose_name=’Purchase Rate’)
+provider_rate_currency = models.CharField(max_length=3, blank=True, null=True)
+provided_rate = models.PositiveIntegerField(blank=True, null=True, default=None, verbose_name=’Sell Rate’)
+provided_rate_currency = models.CharField(max_length=3, blank=True, null=True)
+tax = models.ForeignKey(“cp_qb.QuickbooksTaxes”, blank=True, null=True)
+# tax_description = models.CharField(max_length=128, blank=True, null=True)
+mode = models.ForeignKey(‘modes.Modes’, blank=True, null=True)
+asset = models.ForeignKey(‘assets.Assets’, blank=True, null=True)
+weight = models.PositiveIntegerField(default=20)
+num_assets = models.PositiveIntegerField(default=1)
+used_assets = models.PositiveIntegerField(default=0)
+rate_for_date = models.DateTimeField(default=timezone.now)
+rate_type = models.IntegerField(default=RATE_TYPE_SPOT, choices=RATE_TYPE_CHOICES)
+service_provider = models.ForeignKey(‘stakeholder.Stakeholder’, related_name=’rate_service_provider’,</p>
+<blockquote>
+<div>blank=True, null=True)</div></blockquote>
+<dl class="docutils">
+<dt>for_stakeholder = models.ForeignKey(‘stakeholder.Stakeholder’, related_name=’rate_for_stakeholder’,</dt>
+<dd>blank=True, null=True, default=None)</dd>
+</dl>
+<p>rate_expiry_date = models.DateTimeField(blank=True, null=True)
+hub_list = models.ManyToManyField(‘hubs.Hubs’, through=’rates.RateLeg’)
+tax_currency = models.CharField(max_length=3, blank=True, null=True)
+is_import = models.BooleanField(default=False)
+is_cancelled = models.BooleanField(default=False, blank=True)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.service_provider.user.email)</dd>
+<dt>def get_unquoted_legs(self):</dt>
+<dd>return None</dd>
+<dt>def get_rate_legs(self):</dt>
+<dd>return RateLeg.objects.filter(rate=self).order_by(‘leg_num’)</dd>
+<dt>def get_charges(self):</dt>
+<dd>return Charges.objects.filter(chargeforrate__rate=self)</dd>
+</dl>
+<p># def get_total_charge(self):
+#     return self.get_charges().aggregate(charge=Sum(‘charge’))[‘charge’]</p>
+<dl class="last docutils">
+<dt>def get_total_charge(self):</dt>
+<dd><p class="first">charge_value=0
+charges = self.get_charges()
+for charge in charges:</p>
+<blockquote>
+<div><p>converted_charge = ExchangeRateHelper.convert_currency(charge.charge_currency,self.provider_rate_currency,charge.charge)
+if charge.is_atomic:</p>
+<blockquote>
+<div>charge_value += converted_charge / self.num_assets</div></blockquote>
+<dl class="docutils">
+<dt>else:</dt>
+<dd>charge_value += converted_charge</dd>
+</dl>
+</div></blockquote>
+<p class="last">return charge_value</p>
+</dd>
+<dt>def get_penalties(self):</dt>
+<dd>return Penalty.objects.filter(penaltyforrate__rate=self)</dd>
+<dt>def clone_contract(self):</dt>
+<dd><dl class="first docutils">
+<dt>c_rate = Rates.objects.create(</dt>
+<dd>is_return=self.is_return,
+provider_rate=self.provider_rate,
+provider_rate_currency=self.provider_rate_currency,
+provided_rate=self.provided_rate,
+provided_rate_currency=self.provided_rate_currency,
+tax=self.tax,
+# tax_description=self.tax_description,
+mode=self.mode,
+asset=self.asset,
+weight=self.weight,
+num_assets=self.num_assets,
+used_assets=self.used_assets,
+rate_for_date=self.rate_for_date,
+rate_type=self.RATE_TYPE_SPOT,
+service_provider=self.service_provider,
+for_stakeholder=self.for_stakeholder,
+rate_expiry_date=self.rate_expiry_date,
+tax_currency=self.tax_currency,
+is_import=self.is_import,</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>for rate_leg in self.rateleg_set.all():</dt>
+<dd><dl class="first docutils">
+<dt>RateLeg.objects.create(</dt>
+<dd>rate=c_rate,
+hub=rate_leg.hub,
+leg_num=rate_leg.leg_num</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">return c_rate</p>
+</dd>
+</dl>
+</dd>
+<dt>class RateLeg(DateBaseModel):</dt>
+<dd><p class="first">rate = models.ForeignKey(‘rates.Rates’)
+hub = models.ForeignKey(‘hubs.Hubs’)
+leg_num = models.PositiveIntegerField(default=0)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return ‘{}-{}’.format(str(self.rate.service_provider.user.email), str(self.hub.name))</dd>
+</dl>
+</dd>
+<dt>class AbstractTypeCharges(DateBaseModel):</dt>
+<dd><p class="first">CHARGE_TYPE_SPOT = 0
+CHARGE_TYPE_CONTRACT = 1</p>
+<dl class="docutils">
+<dt>CHARGE_TYPE_CHOICES = (</dt>
+<dd>(CHARGE_TYPE_SPOT, ‘spot’),
+(CHARGE_TYPE_CONTRACT, ‘contract’)</dd>
+</dl>
+<p>)</p>
+<p>STAKEHOLDER_TYPE_SHIPPER = 0
+STAKEHOLDER_TYPE_VENDOR = 1
+STAKEHOLDER_TYPE_HUBOWNER = 2</p>
+<dl class="docutils">
+<dt>STAKEHOLDER_TYPE_CHOICES = (</dt>
+<dd>(STAKEHOLDER_TYPE_SHIPPER, ‘shipper’),
+(STAKEHOLDER_TYPE_VENDOR, ‘vendor’),
+(STAKEHOLDER_TYPE_HUBOWNER, ‘hubowner’)</dd>
+</dl>
+<p>)
+SHOW_FOR_STAKEHOLDER_SHIPPER = 0
+SHOW_FOR_STAKEHOLDER_TRANSPORTER = 1
+SHOW_FOR_STAKEHOLDER_HUBOWNER = 2
+SHOW_FOR_STAKEHOLDER_FORWARDER = 3</p>
+<dl class="docutils">
+<dt>SHOW_FOR_STAKEHOLDER_CHOICES = (</dt>
+<dd>(SHOW_FOR_STAKEHOLDER_SHIPPER, ‘shipper’),
+(SHOW_FOR_STAKEHOLDER_TRANSPORTER, ‘transporter’),
+(SHOW_FOR_STAKEHOLDER_HUBOWNER, ‘hubowner’),
+(SHOW_FOR_STAKEHOLDER_FORWARDER, ‘forwarder’)</dd>
+</dl>
+<p>)</p>
+<p>charge = models.PositiveIntegerField()
+tax = models.ForeignKey(“cp_qb.QuickbooksTaxes”, blank=True, null=True)
+# tax_description = models.CharField(max_length=128)
+charge_for_date = models.DateField(max_length=10)
+mode = models.ForeignKey(‘modes.Modes’, blank=True, null=True)
+asset = models.ForeignKey(‘assets.Assets’, blank=True, null=True)
+charge_type = models.IntegerField(default=CHARGE_TYPE_SPOT, choices=CHARGE_TYPE_CHOICES)
+payee_type = models.IntegerField(default=STAKEHOLDER_TYPE_SHIPPER, choices=STAKEHOLDER_TYPE_CHOICES)
+payer_type = models.IntegerField(default=STAKEHOLDER_TYPE_SHIPPER, choices=STAKEHOLDER_TYPE_CHOICES)
+description = models.CharField(max_length=512)
+hub = models.ForeignKey(‘hubs.Hubs’, blank=True, null=True)
+charge_currency = models.CharField(max_length=3, blank=True, null=True)
+tax_currency = models.CharField(max_length=3, blank=True, null=True)
+mark_up = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+is_atomic = models.BooleanField(default=False)
+show_for_stakeholder = models.IntegerField(default=SHOW_FOR_STAKEHOLDER_TRANSPORTER,</p>
+<blockquote>
+<div>choices=SHOW_FOR_STAKEHOLDER_CHOICES)</div></blockquote>
+<dl class="last docutils">
+<dt>def create_charge(self, created_by, charge, tax, charge_currency=None, tax_currency=None):</dt>
+<dd><dl class="first docutils">
+<dt>return self._create_charges(</dt>
+<dd>created_by=created_by,
+charge=charge,
+tax=tax,
+charge_currency=charge_currency or self.charge_currency,
+tax_currency=tax_currency or self.tax_currency</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def _create_charges(self, created_by, charge, tax, charge_currency, tax_currency):</dt>
+<dd><dl class="first docutils">
+<dt>return Charges.objects.create(</dt>
+<dd>created_by=created_by,
+charge=charge,
+tax=tax,
+# tax_description=self.tax_description,
+charge_for_date=self.charge_for_date,
+mode=self.mode,
+asset=self.asset,
+charge_type=self.charge_type,
+payee_type=self.payee_type,
+payer_type=self.payer_type,
+description=self.description,
+hub=self.hub,
+charge_currency=charge_currency,
+tax_currency=tax_currency,
+mark_up=self.mark_up,
+abstract_charge=self,
+is_atomic=self.is_atomic,
+show_for_stakeholder = self.show_for_stakeholder</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def __str__(self):</dt>
+<dd>return str(self.description.encode(‘utf8’, ‘ignore’))</dd>
+</dl>
+</dd>
+<dt>class Charges(DateBaseModel):</dt>
+<dd><p class="first">CHARGE_TYPE_SPOT = 0
+CHARGE_TYPE_CONTRACT = 1</p>
+<dl class="docutils">
+<dt>CHARGE_TYPE_CHOICES = (</dt>
+<dd>(CHARGE_TYPE_SPOT, ‘spot’),
+(CHARGE_TYPE_CONTRACT, ‘contract’)</dd>
+</dl>
+<p>)</p>
+<p>STAKEHOLDER_TYPE_SHIPPER = 0
+STAKEHOLDER_TYPE_VENDOR = 1
+STAKEHOLDER_TYPE_HUBOWNER = 2</p>
+<dl class="docutils">
+<dt>STAKEHOLDER_TYPE_CHOICES = (</dt>
+<dd>(STAKEHOLDER_TYPE_SHIPPER, ‘shipper’),
+(STAKEHOLDER_TYPE_VENDOR, ‘vendor’),
+(STAKEHOLDER_TYPE_HUBOWNER, ‘hubowner’)</dd>
+</dl>
+<p>)
+SHOW_FOR_STAKEHOLDER_SHIPPER = 0
+SHOW_FOR_STAKEHOLDER_TRANSPORTER=1
+SHOW_FOR_STAKEHOLDER_HUBOWNER = 2
+SHOW_FOR_STAKEHOLDER_FORWARDER = 3</p>
+<dl class="docutils">
+<dt>SHOW_FOR_STAKEHOLDER_CHOICES = (</dt>
+<dd>(SHOW_FOR_STAKEHOLDER_SHIPPER, ‘shipper’),
+(SHOW_FOR_STAKEHOLDER_TRANSPORTER, ‘transporter’),
+(SHOW_FOR_STAKEHOLDER_HUBOWNER, ‘hubowner’),
+(SHOW_FOR_STAKEHOLDER_FORWARDER, ‘forwarder’)</dd>
+</dl>
+<p>)</p>
+<p>charge = models.PositiveIntegerField()
+tax = models.ForeignKey(“cp_qb.QuickbooksTaxes”, blank=True, null=True)
+# tax_description = models.CharField(max_length=128)
+charge_for_date = models.DateField(max_length=10)
+mode = models.ForeignKey(‘modes.Modes’, blank=True, null=True)
+asset = models.ForeignKey(‘assets.Assets’, blank=True, null=True)
+charge_type = models.IntegerField(default=CHARGE_TYPE_SPOT, choices=CHARGE_TYPE_CHOICES)
+payee_type = models.IntegerField(default=STAKEHOLDER_TYPE_SHIPPER, choices=STAKEHOLDER_TYPE_CHOICES)
+payer_type = models.IntegerField(default=STAKEHOLDER_TYPE_SHIPPER, choices=STAKEHOLDER_TYPE_CHOICES)
+description = models.CharField(max_length=512)
+hub = models.ForeignKey(‘hubs.Hubs’, blank=True, null=True)
+charge_currency = models.CharField(max_length=3, blank=True, null=True)
+tax_currency = models.CharField(max_length=3, blank=True, null=True)
+mark_up = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+created_by = models.ForeignKey(‘stakeholder.Stakeholder’, blank=True, null=True)
+abstract_charge = models.ForeignKey(AbstractTypeCharges, related_name=’child_charge’)
+is_atomic = models.BooleanField(default=False)
+show_for_stakeholder = models.IntegerField(default=SHOW_FOR_STAKEHOLDER_TRANSPORTER,choices=SHOW_FOR_STAKEHOLDER_CHOICES)</p>
+<dl class="last docutils">
+<dt>def create_applied_charge(self, cp_booking, booking):</dt>
+<dd><dl class="first docutils">
+<dt>return AppliedCharges.objects.create(</dt>
+<dd><p class="first">booking=booking,
+cp_booking=cp_booking,
+charge=self,
+payee=self.get_stakeholder(</p>
+<blockquote>
+<div>cp_booking=cp_booking,
+booking=booking,
+hub=self.hub,
+type=self.payee_type</div></blockquote>
+<p>),
+payer=self.get_stakeholder(</p>
+<blockquote>
+<div>cp_booking=cp_booking,
+booking=booking,
+hub=self.hub,
+type=self.payer_type</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def charge_currency_conversion(self):</dt>
+<dd>to_currecy_code = ‘INR’
+converted_currency = ExchangeRateHelper.convert_currency(self.charge_currency, to_currecy_code,self.charge)
+return converted_currency</dd>
+<dt>def __str__(self):</dt>
+<dd>return str(self.description.encode(‘utf8’, ‘ignore’))</dd>
+<dt>def get_total_charge(self):</dt>
+<dd>total_charge = self.charge_currency_conversion() * (1 + (float(self.tax.tax) / 100))
+return total_charge</dd>
+<dt>def get_receivable_charge(self):</dt>
+<dd>return (self.charge_currency_conversion() * (1 + (self.mark_up / 100))) * (1 + (self.tax.tax / 100))</dd>
+<dt>def get_stakeholder(self, cp_booking, booking, hub, type):</dt>
+<dd><dl class="first last docutils">
+<dt>if type == AbstractTypeCharges.STAKEHOLDER_TYPE_SHIPPER:</dt>
+<dd>return cp_booking.quote.stakeholder</dd>
+<dt>elif type == AbstractTypeCharges.STAKEHOLDER_TYPE_VENDOR:</dt>
+<dd>return booking.service_provider</dd>
+<dt>elif type == AbstractTypeCharges.STAKEHOLDER_TYPE_HUBOWNER:</dt>
+<dd>return hub.stakeholder</dd>
+<dt>else:</dt>
+<dd>return None</dd>
+</dl>
+</dd>
+<dt>def get_purchase_tax_amount(self):</dt>
+<dd>return float(self.charge_currency_conversion() * (self.tax.tax / 100))
+#return float (self.charge * (self.tax.tax / 100))</dd>
+<dt>def get_purchase_total_amount(self):</dt>
+<dd>return float(self.charge_currency_conversion())</dd>
+<dt>def get_sell_rate(self):</dt>
+<dd>return float(self.charge_currency_conversion() * float((1 + (self.mark_up / 100))))</dd>
+<dt>def get_sell_tax_amount(self):</dt>
+<dd>return float(self.get_sell_rate() * (float(self.tax.tax) / 100))</dd>
+<dt>def get_sell_total_amount(self):</dt>
+<dd>return float(self.get_sell_rate())</dd>
+</dl>
+</dd>
+<dt>class ChargeForRate(DateBaseModel):</dt>
+<dd><p class="first">charge = models.ForeignKey(Charges, on_delete=models.CASCADE)
+rate = models.ForeignKey(Rates)</p>
+<dl class="last docutils">
+<dt>def create_charge_for_booking(self, booking):</dt>
+<dd>return ChargeForBooking.objects.create(charge=self.charge, booking=booking)</dd>
+<dt>def __str__(self):</dt>
+<dd>return str(self.charge.description)</dd>
+</dl>
+</dd>
+<dt>class ChargeForBooking(DateBaseModel):</dt>
+<dd><p class="first">charge = models.ForeignKey(Charges)
+booking = models.ForeignKey(‘booking.Booking’, related_name=’charge_booking’)</p>
+<dl class="last docutils">
+<dt>def create_applied_charge(self, cp_booking):</dt>
+<dd><dl class="first docutils">
+<dt>return self.charge.create_applied_charge(</dt>
+<dd>cp_booking=cp_booking,
+booking=self.booking</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def __str__(self):</dt>
+<dd>return str(self.charge.description)</dd>
+</dl>
+</dd>
+<dt>class AppliedCharges(DateBaseModel):</dt>
+<dd><p class="first">charge = models.OneToOneField(Charges)
+booking = models.ForeignKey(‘booking.Booking’)
+cp_booking = models.ForeignKey(‘booking.CPBooking’)
+payer = models.ForeignKey(‘stakeholder.Stakeholder’, related_name=’payer_applied_charge’)
+payee = models.ForeignKey(‘stakeholder.Stakeholder’, related_name=’payee_applied_charge’)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.charge.description)</dd>
+<dt>def get_applied_charge_amount(self):</dt>
+<dd><dl class="first docutils">
+<dt>if self.charge.is_atomic:</dt>
+<dd>curr_charge_amount = self.charge.charge</dd>
+<dt>else:</dt>
+<dd>curr_charge_amount = self.charge.charge * self.booking.num_assets</dd>
+</dl>
+<p class="last">return curr_charge_amount</p>
+</dd>
+<dt>def get_applied_charge_purchase_tax(self):</dt>
+<dd>return (1 + (float(self.charge.tax.tax) / 100))</dd>
+<dt>def get_applied_charge_purchase_total_amount(self):</dt>
+<dd>gross_amount = float(self.get_applied_charge_amount() * self.get_applied_charge_purchase_tax())
+return gross_amount</dd>
+<dt>def get_applied_charge_sell_rate(self):</dt>
+<dd>return (1+ (float(self.charge.mark_up) / 100))</dd>
+<dt>def get_applied_charge_sell_rate_tax_amount(self):</dt>
+<dd>sell_rate_amount = float(self.get_applied_charge_amount() * self.get_applied_charge_sell_rate() * (float(self.charge.tax.tax)/100))
+return sell_rate_amount</dd>
+<dt>def get_applied_charge_sell_total_amount(self):</dt>
+<dd>total_sell_rate_amount = float(self.get_applied_charge_sell_rate() + self.get_applied_charge_sell_rate_tax_amount())
+return total_sell_rate_amount</dd>
+<dt>def get_receivable_applied_charge(self):</dt>
+<dd>receivable_amount = float(self.get_applied_charge_amount() * self.get_applied_charge_sell_rate() * self.get_applied_charge_purchase_tax())
+return receivable_amount</dd>
+<dt>def get_qb_bill_line_item(self):</dt>
+<dd><p class="first">item_detail = “ItemBasedExpenseLineDetail”</p>
+<p>qty = 1</p>
+<p># amt = self.charge.get_sell_total_amount()
+amt = self.charge.get_purchase_total_amount()</p>
+<p>unit_price = copy(amt)</p>
+<dl class="docutils">
+<dt>if self.charge.is_atomic:</dt>
+<dd>unit_price = self.charge.charge / self.booking.num_assets</dd>
+<dt>line_entry = {</dt>
+<dd><p class="first">“Amount”: amt * qty,
+“Description”: self.charge.description,
+“DetailType”: item_detail,
+item_detail: {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>‘MarkupInfo’: {</dt>
+<dd>‘Percent’: str(float(self.charge.mark_up))</dd>
+</dl>
+<p>},
+“CustomerRef”: {</p>
+<blockquote>
+<div>“value”: self.cp_booking.quote.quickbooks_id,</div></blockquote>
+<p>},
+“ItemRef”: {</p>
+<blockquote>
+<div>“value”: QuickbooksServices.objects.get(name=’Charges’).quickbook_id</div></blockquote>
+<p>},
+“Qty”: qty,
+“UnitPrice”: unit_price,
+“TaxCodeRef”: {</p>
+<blockquote>
+<div>“value”: str(self.charge.tax.quickbook_id)</div></blockquote>
+<p>},
+“BillableStatus”: “Billable”</p>
+</div></blockquote>
+<p class="last">},</p>
+</dd>
+</dl>
+<p>}</p>
+<dl class="docutils">
+<dt>if self.charge.tax:</dt>
+<dd><dl class="first docutils">
+<dt>line_entry[item_detail][‘TaxCodeRef’] = {</dt>
+<dd>“value”: str(self.charge.tax.quickbook_id)</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p class="last">return line_entry</p>
+</dd>
+</dl>
+<p>def get_qb_line_item(self, sell=True, is_sales=False):</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>if is_sales:</dt>
+<dd>item_detail = “SalesItemLineDetail”</dd>
+<dt>else:</dt>
+<dd>item_detail = “ItemBasedExpenseLineDetail”</dd>
+</dl>
+<p>qty = 1</p>
+<dl class="docutils">
+<dt>if sell:</dt>
+<dd>amt = self.charge.get_sell_total_amount()</dd>
+<dt>else:</dt>
+<dd>amt = self.charge.get_purchase_total_amount()</dd>
+<dt>if not self.charge.is_atomic:</dt>
+<dd>qty = self.booking.num_assets</dd>
+<dt>line_entry = {</dt>
+<dd><p class="first">“Amount”: amt * qty,
+“Description”: self.charge.description,
+“DetailType”: item_detail,
+item_detail: {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>“ItemRef”: {</dt>
+<dd>“value”: QuickbooksServices.objects.get(name=’Charges’).quickbook_id</dd>
+</dl>
+<p>},
+“Qty”: qty,
+“UnitPrice”: amt,
+“TaxCodeRef”: {</p>
+<blockquote>
+<div>“value”: str(self.charge.tax.quickbook_id)</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p class="last">},</p>
+</dd>
+</dl>
+<p>}</p>
+<dl class="docutils">
+<dt>if self.charge.tax:</dt>
+<dd><dl class="first docutils">
+<dt>line_entry[item_detail][‘TaxCodeRef’] = {</dt>
+<dd>“value”: str(self.charge.tax.quickbook_id)</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>return line_entry</p>
+</div></blockquote>
+</dd>
+</dl>
+<blockquote>
+<div><p>PENALTY_TYPE_PER_HOUR = 1
+PENALTY_TYPE_PER_DAY = 2
+PENALTY_TYPE_PER_WEEK = 3
+PENALTY_TYPE_PER_MONTH = 4</p>
+<dl class="docutils">
+<dt>PENALTY_TYPE_CHOICES = (</dt>
+<dd>(PENALTY_TYPE_FLAT, ‘flat’),
+(PENALTY_TYPE_PER_HOUR, ‘hour’),
+(PENALTY_TYPE_PER_DAY, ‘day’),
+(PENALTY_TYPE_PER_WEEK, ‘week’),
+(PENALTY_TYPE_PER_MONTH, ‘month’)</dd>
+</dl>
+<p>)
+penalty = models.PositiveIntegerField()
+stakeholder_type = models.ForeignKey(‘cp_eav.DynamicTable’)
+for_abtask = models.ForeignKey(‘task.AbstractTask’, blank=True, null=True)
+tax = models.ForeignKey(“cp_qb.QuickbooksTaxes”, blank=True, null=True)
+# tax_description = models.CharField(max_length=128)
+penalty_type = models.IntegerField(default=PENALTY_TYPE_FLAT, choices=PENALTY_TYPE_CHOICES)
+penalty_currency = models.CharField(max_length=3, blank=True, null=True)
+tax_currency = models.CharField(max_length=3, blank=True, null=True)
+mark_up = models.DecimalField(max_digits=5, decimal_places=2, default=10)
+description = models.CharField(max_length=512, blank=True, null=True)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.description.encode(‘utf8’, ‘ignore’))</dd>
+<dt>def create_penalty(self, penalty, tax, penalty_currency=None, tax_currency=None):</dt>
+<dd><dl class="first docutils">
+<dt>return self._create_penalty(</dt>
+<dd>penalty=penalty,
+tax=tax,
+penalty_currency=penalty_currency or self.penalty_currency,
+tax_currency=tax_currency or self.tax_currency</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def _create_penalty(self, penalty, tax, penalty_currency, tax_currency):</dt>
+<dd><dl class="first docutils">
+<dt>return Penalty.objects.create(</dt>
+<dd>penalty=penalty,
+stakeholder_type=self.stakeholder_type,
+for_abtask=self.for_abtask,
+tax_currency=tax_currency,
+tax=tax,
+penalty_type=self.penalty_type,
+penalty_currency=penalty_currency,
+mark_up=self.mark_up,
+# tax_description=self.tax_description,
+abstract_penalty=self</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>class Penalty(DateBaseModel):</dt>
+<dd><p class="first">PENALTY_TYPE_FLAT = 0
+PENALTY_TYPE_PER_HOUR = 1
+PENALTY_TYPE_PER_DAY = 2
+PENALTY_TYPE_PER_WEEK = 3
+PENALTY_TYPE_PER_MONTH = 4</p>
+<dl class="docutils">
+<dt>PENALTY_TYPE_CHOICES = (</dt>
+<dd>(PENALTY_TYPE_FLAT, ‘flat’),
+(PENALTY_TYPE_PER_HOUR, ‘hour’),
+(PENALTY_TYPE_PER_DAY, ‘day’),
+(PENALTY_TYPE_PER_WEEK, ‘week’),
+(PENALTY_TYPE_PER_MONTH, ‘month’)</dd>
+</dl>
+<p>)
+penalty = models.PositiveIntegerField()
+stakeholder_type = models.ForeignKey(‘cp_eav.DynamicTable’)
+for_abtask = models.ForeignKey(‘task.AbstractTask’, blank=True, null=True)
+# for_abtask = models.ManyToManyField(‘task.AbstractTask’)
+tax = models.ForeignKey(“cp_qb.QuickbooksTaxes”, blank=True, null=True)
+# tax_description = models.CharField(max_length=128)
+penalty_type = models.IntegerField(default=PENALTY_TYPE_FLAT, choices=PENALTY_TYPE_CHOICES)
+penalty_currency = models.CharField(max_length=3, blank=True, null=True)
+tax_currency = models.CharField(max_length=3, blank=True, null=True)
+mark_up = models.DecimalField(max_digits=5, decimal_places=2, default=10)
+abstract_penalty = models.ForeignKey(AbstractPenalty, related_name=’child_penalty’)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.abstract_penalty.description)</dd>
+<dt>def create_applied_penalty(self, booking, cp_booking):</dt>
+<dd><dl class="first docutils">
+<dt>return AppliedPenalties.objects.create(</dt>
+<dd>penalty=self,
+booking=booking,
+cp_booking=cp_booking</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def create_penalty_for_booking(self, booking):</dt>
+<dd><dl class="first docutils">
+<dt>return PenaltyForBooking.objects.create(</dt>
+<dd>penalty=self,
+booking=booking</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def create_penalty_for_cp_booking(self, cp_booking):</dt>
+<dd><dl class="first docutils">
+<dt>return PenaltyForCPBooking.objects.create(</dt>
+<dd>penalty=self,
+cp_booking=cp_booking</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def get_purchase_tax_amount(self):</dt>
+<dd>return self.penalty * (self.tax.tax / 100)</dd>
+<dt>def get_purchase_total_amount(self):</dt>
+<dd>return self.penalty + self.get_purchase_tax_amount()</dd>
+<dt>def get_sell_rate(self):</dt>
+<dd>return self.penalty * (1 + (self.mark_up / 100))</dd>
+<dt>def get_sell_tax_amount(self):</dt>
+<dd>return self.get_sell_rate() * (self.tax.tax / 100)</dd>
+<dt>def get_sell_total_amount(self):</dt>
+<dd>return self.get_sell_rate() + self.get_purchase_tax_amount()</dd>
+</dl>
+</dd>
+<dt>class PenaltyForRate(DateBaseModel):</dt>
+<dd><p class="first">penalty = models.ForeignKey(Penalty, on_delete=models.CASCADE)
+rate = models.ForeignKey(Rates)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.penalty.abstract_penalty.description)</dd>
+</dl>
+</dd>
+<dt>class PenaltyForCPBooking(DateBaseModel):</dt>
+<dd><p class="first">penalty = models.ForeignKey(Penalty, related_name=’penalty_cp_booking’)
+cp_booking = models.ForeignKey(‘booking.CPBooking’)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.penalty.abstract_penalty.description)</dd>
+<dt>def create_applied_penalty(self, booking):</dt>
+<dd><dl class="first docutils">
+<dt>self.penalty.create_applied_penalty(</dt>
+<dd>booking=booking,
+cp_booking=self.cp_booking</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>### Not to be used
+class PenaltyForBooking(DateBaseModel):</p>
+<blockquote>
+<div><p>penalty = models.ForeignKey(Penalty, related_name=’penalty_booking’)
+booking = models.ForeignKey(‘booking.Booking’)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.penalty.abstract_penalty.description)</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>class AppliedPenalties(DateBaseModel):</dt>
+<dd><p class="first">penalty = models.OneToOneField(Penalty)
+booking = models.ForeignKey(‘booking.Booking’)
+cp_booking = models.ForeignKey(‘booking.CPBooking’)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.penalty.abstract_penalty.description)</dd>
+</dl>
+</dd>
+<dt>class WinningBids(DateBaseModel):</dt>
+<dd><p class="first">rate = models.ForeignKey(‘rates.Rates’)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.rate.service_provider.user.email)</dd>
+</dl>
+<p>&#64;staticmethod
+def update_winning_bids(rate_instance):</p>
+<blockquote class="last">
+<div><p>hub_condition = ‘’</p>
+<dl class="docutils">
+<dt>for rate_leg in rate_instance.rateleg_set.all():</dt>
+<dd><dl class="first docutils">
+<dt>hub_condition += “”“</dt>
+<dd>AND havershine({lat}, {lng}, h.address_lat, h.address_lng) &lt; 20</dd>
+<dt>“”“.format(</dt>
+<dd>lat=rate_leg.hub.address_lat,
+lng=rate_leg.hub.address_lng</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>delete_query = “””
+DELETE
+FROM rates_winningbids
+WHERE
+rate_id IN (</p>
+<blockquote>
+<div><p>SELECT r.id FROM rates_rates r
+INNER JOIN rates_rateleg leg</p>
+<blockquote>
+<div>ON leg.rate_id = r.id</div></blockquote>
+<dl class="docutils">
+<dt>INNER JOIN hubs_hubs h</dt>
+<dd>ON h.id = leg.hub_id</dd>
+<dt>WHERE 1=1</dt>
+<dd>{hub_condition}</dd>
+<dt>GROUP BY</dt>
+<dd>r.id</dd>
+<dt>HAVING</dt>
+<dd>{num_hubs} = COUNT(leg.hub_id)</dd>
+</dl>
+</div></blockquote>
+<p>)
+“”“.format(</p>
+<blockquote>
+<div>num_hubs=rate_instance.rateleg_set.all().count(),
+hub_condition=hub_condition</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>with connection.cursor() as cursor:</dt>
+<dd>cursor.execute(delete_query)</dd>
+</dl>
+<p>WinningBids.objects.create(rate=rate_instance)</p>
+</div></blockquote>
+</dd>
+<dt>class ContractCharges(DateBaseModel):</dt>
+<dd><p class="first">CHARGE_TYPE_SPOT = 0
+CHARGE_TYPE_CONTRACT = 1</p>
+<dl class="docutils">
+<dt>CHARGE_TYPE_CHOICES = (</dt>
+<dd>(CHARGE_TYPE_SPOT, ‘spot’),
+(CHARGE_TYPE_CONTRACT, ‘contract’)</dd>
+</dl>
+<p>)</p>
+<p>charge = models.PositiveIntegerField()
+tax = models.ForeignKey(“cp_qb.QuickbooksTaxes”, blank=True, null=True)
+# tax_description = models.CharField(max_length=128)
+charge_for_date = models.DateField(max_length=10)
+mode = models.ForeignKey(‘modes.Modes’, blank=True, null=True)
+asset = models.ForeignKey(‘assets.Assets’, blank=True, null=True)
+charge_type = models.IntegerField(default=CHARGE_TYPE_SPOT, choices=CHARGE_TYPE_CHOICES)
+payee = models.ForeignKey(‘stakeholder.Stakeholder’, related_name=’payee_contract_charge’)
+payer = models.ForeignKey(‘stakeholder.Stakeholder’, related_name=’payer_contract_charge’)
+rate = models.ForeignKey(Rates, blank=True, null=True)
+description = models.ForeignKey(ChargeDescription)
+hub = models.ForeignKey(‘hubs.Hubs’, blank=True, null=True)
+charge_currency = models.CharField(max_length=3, blank=True, null=True)
+tax_currency = models.CharField(max_length=3, blank=True, null=True)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.description)</dd>
+<dt>def get_total_charge(self):</dt>
+<dd>total_charge = self.charge * (1 + (float(self.tax) / 100))
+return total_charge</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="r-view.html"
+                        title="previous chapter">rates.views</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="r-serializer.html"
+                        title="next chapter">rates.serializer</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/r-model.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="r-serializer.html" title="rates.serializer"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="r-view.html" title="rates.views"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

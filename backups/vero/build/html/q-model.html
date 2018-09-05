@@ -1,0 +1,830 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>quote.models &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="quote.serializer" href="q-serializer.html" />
+    <link rel="prev" title="quote.view" href="q-view.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="q-serializer.html" title="quote.serializer"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="q-view.html" title="quote.view"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="quote-models">
+<h1>quote.models<a class="headerlink" href="#quote-models" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>import json</p>
+<p>from django.conf import settings
+from django.db import connection
+from django.db import models
+# Create your models here.
+from django.db.models import Max
+from django.db.models.aggregates import Sum, Count
+from django.utils import timezone</p>
+<p>from assets.models import Assets
+from cp_qb.helpers import get_client
+from cp_qb.models import SubUsers
+from cp_qb.models import SubUsers
+from hubs.models import Hubs
+from modes.models import Modes
+from quickbooks.cp_erp.subcustomer import CPSubCustomer
+from quickbooks.exceptions import AuthorizationException
+# from quote import helpers
+from quote.sos_helper import LegGenerator
+from rates.models import Rates, Charges, Penalty
+# from shipment.models import Shipment
+from stakeholder.models import Stakeholder
+from utils.helpers import random_string
+from utils.models import DateBaseModel</p>
+<dl class="docutils">
+<dt>def get_quote_number():</dt>
+<dd><p class="first">quote_string = ‘CPQ-‘ + random_string()</p>
+<dl class="docutils">
+<dt>while Quote.objects.filter(quote_number=quote_string).count() &gt; 0:</dt>
+<dd>quote_string = ‘CPQ-‘ + random_string()</dd>
+</dl>
+<p class="last">return quote_string</p>
+</dd>
+<dt>class Quote(DateBaseModel):</dt>
+<dd><p class="first">WEIGHT_UNIT_UNDEFINED = 0
+WEIGHT_KG = 1
+WEIGHT_METRIC_TON = 2</p>
+<p>VOLUME_UNIT_UNDEFINED = 0
+VOLUME_CUBIC_FEET = 1
+VOLUME_CUBIC_METERS = 2
+VOLUME_LITRES = 3</p>
+<dl class="docutils">
+<dt>WEIGHT_CHOICES = (</dt>
+<dd>(WEIGHT_UNIT_UNDEFINED, ‘undefined’),
+(WEIGHT_KG, ‘kg’),
+(WEIGHT_METRIC_TON, ‘ton’)</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>VOLUME_CHOICES = (</dt>
+<dd>(VOLUME_UNIT_UNDEFINED, ‘undefined’),
+(VOLUME_CUBIC_FEET, ‘cubic_feet’),
+(VOLUME_CUBIC_METERS, ‘cubic_meters’),
+(VOLUME_LITRES, ‘litres’)</dd>
+</dl>
+<p>)</p>
+<p>FOR_DATETYPE_FACTORY = 1
+FOR_DATETYPE_SOURCE_PORT = 2
+# FOR_DATETYPE_DESTINATION = 3</p>
+<dl class="docutils">
+<dt>FOR_DATETYPE_CHOICES = (</dt>
+<dd>(FOR_DATETYPE_FACTORY, ‘factory’),
+(FOR_DATETYPE_SOURCE_PORT, ‘source port’),
+# (FOR_DATETYPE_DESTINATION, ‘destination’),</dd>
+</dl>
+<p>)
+STATUS_PROCESSING = 0
+STATUS_PARTIALLY_COMPLETED = 500
+STATUS_COMPLETED = 1000
+STATUS_CRITICAL = 9999
+STATUS_LAPSED = 10000</p>
+<dl class="docutils">
+<dt>STATUS_CHOICES = (</dt>
+<dd>(STATUS_PROCESSING , ‘Waiting’),
+(STATUS_PARTIALLY_COMPLETED,’Bids Initiated’),
+(STATUS_COMPLETED,’Proceed’),
+(STATUS_CRITICAL,’Critical’),
+(STATUS_LAPSED,’Lapsed’)</dd>
+</dl>
+<p>)</p>
+<p>stakeholder = models.ForeignKey(Stakeholder, blank=True, null=True)
+source = models.ForeignKey(Hubs, related_name=’sourceHubs’)
+destination = models.ForeignKey(Hubs, related_name=’destinationHubs’)
+asset = models.ForeignKey(‘assets.Assets’, blank=True, null=True)</p>
+<p>for_date = models.DateTimeField()
+for_date_choices = models.IntegerField(choices=FOR_DATETYPE_CHOICES, default=FOR_DATETYPE_FACTORY)
+rate = models.DecimalField(max_digits=16, decimal_places=2, blank=True, null=True)
+rate_currency = models.CharField(max_length=3, blank=True, null=True)
+weight = models.DecimalField(max_digits=7, decimal_places=2, blank=True, null=True)
+weight_unit = models.IntegerField(choices=WEIGHT_CHOICES, default=WEIGHT_METRIC_TON)
+stuffing_duration = models.IntegerField(default=24 * 60)
+# volume = models.DecimalField(max_digits=7, decimal_places=2, blank=True, null=True)
+# volume_unit = models.IntegerField(choices=VOLUME_CHOICES, default=VOLUME_UNIT_UNDEFINED)</p>
+<p>include_cha = models.BooleanField(default=True)
+is_dock_stuffing = models.BooleanField(default=False)</p>
+<p>no_of_containers = models.IntegerField()
+selected_route_num = models.PositiveIntegerField(default=None, blank=True, null=True)
+helpscout_id = models.IntegerField(blank=True, null=True)
+quote_number = models.CharField(max_length=32, unique=True, default=get_quote_number)
+billing_address = models.ForeignKey(“cp_qb.SubUsers”, null=True, blank=True)
+quickbooks_id = models.IntegerField(blank=True, null=True)
+cargo_description = models.CharField(blank=True, null=True, max_length=256)
+status = models.IntegerField(choices = STATUS_CHOICES,default=STATUS_PROCESSING)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd><dl class="first last docutils">
+<dt>return ‘{} <span class="classifier-delimiter">:</span> <span class="classifier">{} - {}’.format(str(self.stakeholder.company_name.encode(‘utf8’, ‘ignore’)),</span></dt>
+<dd>str(self.source.name.encode(‘utf8’, ‘ignore’)),
+str(self.destination.name.encode(‘utf8’, ‘ignore’)))</dd>
+</dl>
+</dd>
+<dt>def create_quote_sub_sub_customer(self, sub_user_id):</dt>
+<dd><p class="first">parent_ref = sub_user_id</p>
+<p>sub_sub_user_data = {“DisplayName”: self.id}</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><p class="first">customer_created = CPSubCustomer().create(get_client(), sub_sub_user_data, parent_ref)
+sub_sub_user = SubUsers.objects.create(parent_id=parent_ref, child_str=json.dumps(customer_created),</p>
+<blockquote class="last">
+<div>child_id=customer_created[‘Customer’][‘Id’])</div></blockquote>
+</dd>
+<dt>except AuthorizationException:</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd><dl class="first last docutils">
+<dt>customer_created = CPSubCustomer().create(get_client(sync_token_var=True), sub_sub_user_data,</dt>
+<dd>parent_ref)</dd>
+<dt>sub_sub_user = SubUsers.objects.create(parent_id=parent_ref, child_str=json.dumps(customer_created),</dt>
+<dd>child_id=customer_created[‘Customer’][‘Id’])</dd>
+</dl>
+</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+</dd>
+</dl>
+<p class="last">return customer_created[‘Customer’][‘Id’]</p>
+</dd>
+<dt>def get_stakeholder_sub_user(self):</dt>
+<dd><p class="first">quickbooks_parent = self.stakeholder.quickbooks_customer
+subusers = SubUsers.objects.filter(parent_id=quickbooks_parent)
+subusers_id = []
+for subuser in subusers:</p>
+<blockquote>
+<div>subusers_id.append(subuser.id)</div></blockquote>
+<p class="last">return subusers_id</p>
+</dd>
+<dt>def generate_legs(self):</dt>
+<dd><p class="first">leg_generator = LegGenerator()</p>
+<p>routes = leg_generator.get_routes(self)  # .source, self.destination, self.for_date, self.for_date_choices,
+# self.stuffing_duration)</p>
+<p>route_num = 1
+for route in routes:</p>
+<blockquote>
+<div>route_num = leg_generator.create_legs(self, route, self.asset, route_num, self.for_date)</div></blockquote>
+<p># legs
+if self.quote_legs.count() == 0:</p>
+<blockquote>
+<div>pass
+# no_legs_task(
+#     source=self.source.name,
+#     destination=self.destination.name,
+#     shipper_name=self.stakeholder.company_name,
+#     helpscout_id=self.helpscout_id,
+#     quote_number=self.quote_number,
+#     total_containers=self.no_of_containers
+# )</div></blockquote>
+<p class="last">return</p>
+</dd>
+<dt>def get_total_rate_for_quote(self):</dt>
+<dd><p class="first">selected_legs = self.get_selected_route_legs()
+total_quote_rate = 0
+for leg in selected_legs:</p>
+<blockquote>
+<div>total_quote_rate += leg.rate</div></blockquote>
+<p class="last">return total_quote_rate</p>
+</dd>
+<dt>def get_total_rate_for_quote_transportation(self):</dt>
+<dd><dl class="first docutils">
+<dt>return self.get_confirmed_bookings().filter(</dt>
+<dd>leg__mode=settings.MODE_IDENTIFIERS[‘ROAD’]</dd>
+</dl>
+<p class="last">).distinct().aggregate(sell_rate=Sum(‘sell_rate’))[‘sell_rate’]</p>
+</dd>
+</dl>
+<p>def get_quickbooks_line_item_list(self, is_sales=False):</p>
+<blockquote>
+<div><p>result = []</p>
+<dl class="docutils">
+<dt>for booking in self.get_confirmed_bookings():</dt>
+<dd><p class="first">result.append(booking.get_qb_line_item(is_sales=is_sales))</p>
+<p class="last"># &#64;TODO: add rail bookings</p>
+</dd>
+</dl>
+<p>return result</p>
+</div></blockquote>
+<p>def get_quickbooks_line_item_list_estimate(self):</p>
+<blockquote>
+<div><p>result = []</p>
+<dl class="docutils">
+<dt>for booking in self.get_confirmed_bookings():</dt>
+<dd><p class="first">result.append(booking.get_qb_line_item(is_sales=True))</p>
+<p class="last"># &#64;TODO: add rail bookings</p>
+</dd>
+</dl>
+<p>return result</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>def get_total_rate_for_quote_sea_freight(self):</dt>
+<dd><p class="first">selected_legs = self.get_selected_route_legs()
+total_quote_rate = 0
+for leg in selected_legs:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if leg.mode.dynamic_table.table_name == “Ocean”:</dt>
+<dd>total_quote_rate += leg.rate</dd>
+</dl>
+</div></blockquote>
+<p class="last">return total_quote_rate</p>
+</dd>
+<dt>def get_total_mode_types_in_quote(self):</dt>
+<dd><p class="first">selected_legs = self.get_selected_route_legs()
+modes_dynamic_table = set()
+for leg in selected_legs:</p>
+<blockquote>
+<div>modes_dynamic_table.add(leg.mode.dynamic_table.table_name)</div></blockquote>
+<p class="last">return modes_dynamic_table</p>
+</dd>
+<dt>def get_transportation_route(self):</dt>
+<dd><p class="first">selected_legs = self.get_selected_route_legs()
+selected_legs_transportation = selected_legs.filter(mode__dynamic_table__table_name=”Road”).order_by(“leg_num”)
+transportation_route = []
+transportation_route.append(selected_legs[0].fromHub.name)
+for leg in selected_legs_transportation:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if leg.mode.dynamic_table.table_name == “Road”:</dt>
+<dd>transportation_route.append(leg.toHub.name)</dd>
+</dl>
+</div></blockquote>
+<p class="last">return transportation_route</p>
+</dd>
+<dt>def get_sea_freight_route(self):</dt>
+<dd><p class="first">selected_legs = self.get_selected_route_legs()
+selected_legs_sea_freight = selected_legs.filter(mode__dynamic_table__table_name=”Ocean”).order_by(“leg_num”)
+sea_freight_route = []
+sea_freight_route.append(selected_legs_sea_freight[0].fromHub.name)
+for leg in selected_legs:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if leg.mode.dynamic_table.table_name == “Ocean”:</dt>
+<dd>sea_freight_route.append(leg.toHub.name)</dd>
+</dl>
+</div></blockquote>
+<p class="last">return sea_freight_route</p>
+</dd>
+<dt>def get_legs(self):</dt>
+<dd>return self.quote_legs.all().order_by(‘route_num’, ‘leg_num’)</dd>
+<dt>def get_selected_route_legs(self):</dt>
+<dd>return self.quote_legs.filter(route_num=self.selected_route_num).order_by(‘leg_num’)</dd>
+<dt>def get_selected_route_grouped_legs(self):</dt>
+<dd><p class="first">route_legs = self.get_selected_route_legs()</p>
+<p>grouped_legs = []
+prev_legs = None</p>
+<p>for leg in route_legs:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if prev_legs is None:</dt>
+<dd><dl class="first docutils">
+<dt>prev_legs = {</dt>
+<dd>‘mode’: leg.mode,
+‘legs’: [leg],
+‘is_import’: leg.is_import</dd>
+</dl>
+<p class="last">}
+continue</p>
+</dd>
+<dt>if leg.mode == prev_legs[‘mode’]:</dt>
+<dd>prev_legs.setdefault(‘legs’, []).append(leg)</dd>
+<dt>else:</dt>
+<dd><p class="first">grouped_legs.append(prev_legs)
+prev_legs = {</p>
+<blockquote>
+<div>‘mode’: leg.mode,
+‘legs’: [leg],
+‘is_import’: leg.is_import</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>if prev_legs is not None:</dt>
+<dd>grouped_legs.append(prev_legs)</dd>
+<dt>for grouped_leg in grouped_legs:</dt>
+<dd>hub_list = self.get_hub_list_from_legs(grouped_leg[‘legs’])
+grouped_leg[‘hub_list’] = hub_list</dd>
+</dl>
+<p class="last">return grouped_legs</p>
+</dd>
+</dl>
+<p># def get_charges_of_a_hub(self):
+#     grouped_legs = self.get_selected_route_grouped_legs()
+#     hub_list = grouped_legs[0][‘hub_list’]
+#     charge_list = {}
+#     for i, hub in enumerate(hub_list):
+#         try:
+#             charges = Charges.objects.filter(hub=hub)
+#             total_charge = 0
+#             for charge in charges:
+#                 total_charge += charge.get_total_charge()
+#             charge_list[hub.name + str(“_”) + str(i)] = total_charge
+#         except:
+#             charge = None
+#             charge_list[hub.name + str(“_”) + str(i)] = charge
+#     return charge_list</p>
+<p># def get_charges_of_a_hublist(self):
+#     grouped_legs = self.get_selected_route_grouped_legs()
+#     hub_list = grouped_legs[0][‘hub_list’]
+#     return hub_list</p>
+<dl class="docutils">
+<dt>def get_hub_list_from_legs(self, legs):</dt>
+<dd><dl class="first docutils">
+<dt>if len(legs) == 0:</dt>
+<dd>return []</dd>
+</dl>
+<p>hub_list = [legs[0].fromHub, ]</p>
+<dl class="docutils">
+<dt>for leg in legs:</dt>
+<dd>hub_list.append(leg.toHub)</dd>
+</dl>
+<p class="last">return hub_list</p>
+</dd>
+<dt>def get_rates(self):</dt>
+<dd><p class="first">grouped_legs = self.get_grouped_hub_list()</p>
+<dl class="docutils">
+<dt>for grouped_leg in grouped_legs:</dt>
+<dd><p class="first">grouped_leg[‘rates’] = None
+hub_list = grouped_leg[‘hub_list’]
+charges = Charges.objects.filter(hub__in=grouped_leg[‘hub_list’])</p>
+<dl class="last docutils">
+<dt>if len(grouped_leg[‘legs’]) &gt; 0:</dt>
+<dd>grouped_leg[‘rates’] = list(Rates.objects.raw(self.get_rates_query(grouped_leg)))
+grouped_leg[‘charges’] = Charges.objects.filter(chargeforrate__rate__in=grouped_leg[‘rates’])
+grouped_leg[‘penalties’] = Penalty.objects.filter(penaltyforrate__rate__in=grouped_leg[‘rates’])</dd>
+</dl>
+</dd>
+</dl>
+<p class="last">return grouped_legs</p>
+</dd>
+</dl>
+<p># def get_rates_in_percentile(self):
+#     grouped_legs = self.get_rates()
+#     legs = grouped_legs[‘legs’]
+#     rate_list = []
+#     for leg in legs:
+#         rate_list.append(leg.rate)
+#     max_rate = max(rate_list)
+#     percentile_list = []
+#     for leg in legs:
+#         rate_list.append(legs)
+#     for i in rate_list:
+#         percentile_list.append(((100*rate_list[i])/max_rate))</p>
+<dl class="docutils">
+<dt>def get_vendor_quoted_rate(self, grouped_leg, vendor_id):</dt>
+<dd>return list(Rates.objects.raw(self.get_vendor_rates_query(grouped_leg, vendor_id)))</dd>
+<dt>def get_vendor_rates_query(self, grouped_leg, vendor_id):</dt>
+<dd><dl class="first docutils">
+<dt>return “{rate_query} AND service_provider_id=’{vendor_id}’ ORDER BY rates.provider_rate”.format(</dt>
+<dd>vendor_id=vendor_id,
+rate_query=self.get_rates_query(grouped_leg)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def get_vendors_min_rate(self, grouped_leg):</dt>
+<dd><dl class="first docutils">
+<dt>with connection.cursor() as cursor:</dt>
+<dd>cursor.execute(self.get_vendors_min_rate_query(grouped_leg))
+row = cursor.fetchone()</dd>
+</dl>
+<p class="last">return row[0]</p>
+</dd>
+<dt>def is_min_rate(self, rate, grouped_leg):</dt>
+<dd>return rate.provided_rate == self.get_vendors_min_rate(grouped_leg)</dd>
+</dl>
+<p>def get_min_rate_object(self):</p>
+<blockquote>
+<div>return</div></blockquote>
+<dl class="docutils">
+<dt>def get_vendors_min_rate_query(self, grouped_leg, rate_type=Rates.RATE_TYPE_SPOT):</dt>
+<dd><p class="first">hub_query = ‘’</p>
+<p>appender = ‘’
+for index, hub in enumerate(grouped_leg[‘hub_list’]):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>hub_query += “”“</dt>
+<dd><blockquote class="first">
+<div><blockquote>
+<div><dl class="docutils">
+<dt>{appender} (</dt>
+<dd>havershine(hubs.address_lat, hubs.address_lng, {lat},{lng}) &lt; 20 AND
+rate_leg.leg_num = {leg_num}</dd>
+</dl>
+<p>)</p>
+</div></blockquote>
+<p>“”“.format(</p>
+</div></blockquote>
+<p class="last">appender=appender,
+lat=hub.address_lat,
+lng=hub.address_lng,
+leg_num=index + 1</p>
+</dd>
+</dl>
+<p>)
+appender = ‘OR’</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>if self.stakeholder_id:</dt>
+<dd>stakeholder_id = “’{}’”.format(self.stakeholder_id)</dd>
+<dt>else:</dt>
+<dd>stakeholder_id = ‘null’</dd>
+<dt>query = “”“</dt>
+<dd><blockquote class="first">
+<div><blockquote>
+<div><dl class="docutils">
+<dt>SELECT</dt>
+<dd>MIN(convert_currency(provider_rate, provider_rate_currency, ‘INR’))</dd>
+<dt>FROM</dt>
+<dd>rates_rates rates</dd>
+<dt>WHERE</dt>
+<dd><p class="first">rates.asset_id = ‘{asset}’ AND
+rates.mode_id = ‘{mode}’ AND
+rates.weight &lt;= {weight} AND
+rates.rate_expiry_date &gt;= ‘{date}’ AND
+rates.num_assets &gt; rates.used_assets AND
+rates.rate_type = {rate_type} AND
+(</p>
+<blockquote>
+<div>rates.for_stakeholder_id = {shipper} OR
+rates.for_stakeholder_id IS NULL</div></blockquote>
+<p>) AND
+(</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>{num_hubs} = (</dt>
+<dd><dl class="first last docutils">
+<dt>SELECT</dt>
+<dd>COUNT(*)</dd>
+<dt>FROM</dt>
+<dd>rates_rateleg rate_leg,
+hubs_hubs hubs</dd>
+<dt>WHERE</dt>
+<dd><p class="first">rate_leg.rate_id = rates.id AND
+hubs.id = rate_leg.hub_id AND
+(</p>
+<blockquote>
+<div>{hub_list_condition}</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>)</p>
+</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>“”“.format(</p>
+</div></blockquote>
+<p class="last">asset=self.asset.id,
+mode=grouped_leg[‘mode’].id,
+date=grouped_leg[‘start_date’] - timezone.timedelta(days=1),
+num_hubs=len(grouped_leg[‘hub_list’]),
+hub_list_condition=hub_query,
+shipper=stakeholder_id,
+weight=self.weight,
+rate_type=rate_type</p>
+</dd>
+</dl>
+<p>)</p>
+<p class="last">return query</p>
+</dd>
+</dl>
+<p>def get_rates_query(self, grouped_leg, rate_type=Rates.RATE_TYPE_SPOT):</p>
+<blockquote>
+<div><p>hub_query = ‘’</p>
+<p>appender = ‘’
+for index, hub in enumerate(grouped_leg[‘hub_list’]):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>hub_query += “”“</dt>
+<dd><dl class="first docutils">
+<dt>{appender} (</dt>
+<dd>havershine(hubs.address_lat, hubs.address_lng, {lat},{lng}) &lt; 20 AND
+rate_leg.leg_num = {leg_num}</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>“”“.format(</dt>
+<dd>appender=appender,
+lat=hub.address_lat,
+lng=hub.address_lng,
+leg_num=index + 1</dd>
+</dl>
+<p>)
+appender = ‘OR’</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>if self.stakeholder_id:</dt>
+<dd>stakeholder_id = “’{}’”.format(self.stakeholder_id)</dd>
+<dt>else:</dt>
+<dd>stakeholder_id = ‘null’</dd>
+<dt>query = “”“</dt>
+<dd><dl class="first last docutils">
+<dt>SELECT</dt>
+<dd><ul class="first last simple">
+<li></li>
+</ul>
+</dd>
+<dt>FROM</dt>
+<dd>rates_rates rates</dd>
+<dt>WHERE</dt>
+<dd><p class="first">rates.asset_id = ‘{asset}’ AND
+rates.weight &lt;= {weight} AND
+rates.mode_id = ‘{mode}’ AND
+rates.rate_expiry_date &gt;= ‘{date}’ AND
+rates.num_assets &gt; rates.used_assets AND
+rates.rate_type = {rate_type} AND
+(</p>
+<blockquote>
+<div>rates.for_stakeholder_id = {shipper} OR
+rates.for_stakeholder_id IS NULL</div></blockquote>
+<p>) AND
+(</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>{num_hubs} = (</dt>
+<dd><dl class="first last docutils">
+<dt>SELECT</dt>
+<dd>COUNT(*)</dd>
+<dt>FROM</dt>
+<dd>rates_rateleg rate_leg,
+hubs_hubs hubs</dd>
+<dt>WHERE</dt>
+<dd><p class="first">rate_leg.rate_id = rates.id AND
+hubs.id = rate_leg.hub_id AND
+(</p>
+<blockquote>
+<div>{hub_list_condition}</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>)</p>
+</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>“”“.format(</dt>
+<dd>asset=self.asset.id,
+mode=grouped_leg[‘mode’].id,
+date=grouped_leg[‘legs’][0].start_date - timezone.timedelta(days=1),
+num_hubs=len(grouped_leg[‘hub_list’]),
+hub_list_condition=hub_query,
+shipper=stakeholder_id,
+# weight=self.weight,
+weight=self.weight or 50,
+rate_type=rate_type</dd>
+</dl>
+<p>)</p>
+<p>return query</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>def get_grouped_hub_list(self, filter_mode=None):</dt>
+<dd><p class="first">hub_list_group = []</p>
+<dl class="docutils">
+<dt>for elem in self.get_selected_route_grouped_legs():</dt>
+<dd><dl class="first docutils">
+<dt>curr_group = {</dt>
+<dd>‘mode’: elem[‘mode’],
+‘hub_list’: self.get_hub_list_from_legs(elem[‘legs’]),
+‘is_import’: elem[‘is_import’],
+‘start_date’: elem[‘legs’][0].start_date,
+‘legs’: elem[‘legs’]</dd>
+</dl>
+<p>}</p>
+<dl class="docutils">
+<dt>if filter_mode:</dt>
+<dd><dl class="first last docutils">
+<dt>if not elem[‘mode’].dynamic_table.table_name == filter_mode:</dt>
+<dd>continue</dd>
+</dl>
+</dd>
+</dl>
+<p class="last">hub_list_group.append(curr_group)</p>
+</dd>
+</dl>
+<p class="last">return hub_list_group</p>
+</dd>
+<dt>def get_hub_list(self):</dt>
+<dd>return (self.get_hub_list_from_legs(self.get_selected_route_legs()))</dd>
+<dt>def get_num_routes(self):</dt>
+<dd>route_num = self.quote_legs.all().aggregate(route_num=Max(‘route_num’))
+return route_num[‘route_num’]</dd>
+<dt>def get_confirmed_bookings(self):</dt>
+<dd><p class="first">return self.booking_set.filter(</p>
+<blockquote>
+<div>confirmation_date__isnull=False,
+is_cancelled=False</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_unconfirmed_bookings(self):</dt>
+<dd><dl class="first docutils">
+<dt>return self.booking_set.filter(</dt>
+<dd>confirmation_date__isnull=True,
+is_cancelled=False,</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def get_selected_bookings(self):</dt>
+<dd><dl class="first docutils">
+<dt>return self.booking_set.filter(</dt>
+<dd>confirmation_date__isnull=True,
+is_cancelled=False,</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def get_cancelled_bookings(self):</dt>
+<dd><dl class="first docutils">
+<dt>return self.booking_set.filter(</dt>
+<dd>is_cancelled=True</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def is_all_bookings_confirmed(self):</dt>
+<dd>confirmed_bookings = self.get_confirmed_bookings().aggregate(num_assets=Sum(‘num_assets’), count=Count(‘id’))
+return confirmed_bookings[‘num_assets’] == self.no_of_containers * len(self.get_selected_route_grouped_legs())</dd>
+<dt>def get_confirmed_booking_of_vendor(self, stakeholder):</dt>
+<dd>return self.get_confirmed_bookings().filter(service_provider=stakeholder).first()</dd>
+<dt>def get_involved_vendor_types(self):</dt>
+<dd><dl class="first last docutils">
+<dt>if self.selected_route_num:</dt>
+<dd><p class="first">vendor_types = set([])
+for leg in self.get_selected_route_legs():</p>
+<blockquote>
+<div>curr_vendor_type = settings.MODE_VENDORS[leg.mode.dynamic_table.table_name]
+vendor_types.add(curr_vendor_type)</div></blockquote>
+<p class="last">return list(vendor_types)</p>
+</dd>
+<dt>else:</dt>
+<dd>raise Exception(‘Vendor list available only for quotes with selected routes’)</dd>
+</dl>
+</dd>
+<dt>def get_route_str(self):</dt>
+<dd><dl class="first last docutils">
+<dt>if self.selected_route_num:</dt>
+<dd><p class="first">selected_route_legs = self.get_selected_route_legs()
+route = [selected_route_legs[0].fromHub.name, ]</p>
+<dl class="docutils">
+<dt>for leg in selected_route_legs:</dt>
+<dd>route.append(leg.toHub.name)</dd>
+</dl>
+<p class="last">return ” -&gt; “.join(route)</p>
+</dd>
+<dt>else:</dt>
+<dd>raise Exception(‘Route string available only for quotes with selected routes’)</dd>
+</dl>
+</dd>
+</dl>
+<p>def clone_rates(self):</p>
+<blockquote class="last">
+<div><p>grouped_legs = self.get_selected_route_grouped_legs()</p>
+<p>queries = []</p>
+<dl class="docutils">
+<dt>for grouped_leg in grouped_legs:</dt>
+<dd><dl class="first docutils">
+<dt>queries.append(</dt>
+<dd>self.get_rates_query(grouped_leg, rate_type=Rates.RATE_TYPE_CONTRACT)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>queryset = Rates.objects.raw(</dt>
+<dd>“nUNIONn”.join(queries)</dd>
+</dl>
+<p>)</p>
+<p>cloned_contracts = []</p>
+<dl class="docutils">
+<dt>for rate in list(queryset):</dt>
+<dd>cloned_contracts.append(rate.clone_contract())</dd>
+</dl>
+<p>return cloned_contracts</p>
+</div></blockquote>
+</dd>
+<dt>class Leg(DateBaseModel):</dt>
+<dd><p class="first">quote = models.ForeignKey(Quote, null=True, blank=True, related_name=’quote_legs’)
+mode = models.ForeignKey(Modes)
+asset = models.ForeignKey(‘assets.Assets’, blank=True, null=True)
+fromHub = models.ForeignKey(Hubs, related_name=’from_hub_leg’)
+toHub = models.ForeignKey(Hubs, related_name=’to_hub_leg’)</p>
+<p>arrival_date = models.DateTimeField(blank=True, null=True)
+start_date = models.DateTimeField()
+duration = models.PositiveIntegerField(default=60)
+delay = models.PositiveIntegerField(default=0)
+description_text = models.CharField(max_length=256, default=’‘)</p>
+<p>leg_num = models.PositiveIntegerField(default=0)
+route_num = models.PositiveIntegerField(default=0)</p>
+<p>rate = models.PositiveIntegerField(default=0)
+rate_currency = models.CharField(max_length=3, blank=True, null=True)</p>
+<p>is_import = models.NullBooleanField(blank=True, null=True, default=None)
+is_active = models.BooleanField(default=False)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return ‘{}-{}-{}-{}-{}’.format(self.leg_num, self.route_num, self.fromHub.name, self.toHub.name, self.mode.dynamic_table.table_name)</dd>
+<dt>def get_end_date(self):</dt>
+<dd>return self.start_date + timezone.timedelta(minutes=self.duration)</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="q-view.html"
+                        title="previous chapter">quote.view</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="q-serializer.html"
+                        title="next chapter">quote.serializer</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/q-model.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="q-serializer.html" title="quote.serializer"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="q-view.html" title="quote.view"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

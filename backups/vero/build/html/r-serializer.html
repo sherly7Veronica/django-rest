@@ -1,0 +1,1185 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>rates.serializer &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="task.views" href="t-view.html" />
+    <link rel="prev" title="rates.models" href="r-model.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="t-view.html" title="task.views"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="r-model.html" title="rates.models"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="rates-serializer">
+<h1>rates.serializer<a class="headerlink" href="#rates-serializer" title="Permalink to this headline">¶</a></h1>
+<p>from django.conf import settings
+from django.utils import timezone
+from rest_framework import serializers</p>
+<p>from assets.serializer import AssetsSerializer
+from cp_qb.serializer import QuickbooksTaxesSerializer
+from hubs.serializer import HubsShortSerializer, HubsNameSerializer
+from modes.models import Modes
+from payments.helpers import ExchangeRateHelper
+from quote.models import Quote
+from rates.models import Rates, ChargeDescription, RateLeg, Charges, AbstractTypeCharges, WinningBids, </p>
+<blockquote>
+<div>ContractCharges, AbstractPenalty, Penalty, ChargeForRate, PenaltyForRate</div></blockquote>
+<p>from stakeholder.serializers import StakeholderDetailSerializer</p>
+<dl class="docutils">
+<dt>class HubListRetrieveSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">hub = HubsShortSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = RateLeg
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘hub’,
+‘leg_num’</div></blockquote>
+<p>)
+extra_kwargs = {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,
+‘required’: False</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+<dt>class HubListSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = RateLeg
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘hub’,
+‘leg_num’</div></blockquote>
+<p>)
+extra_kwargs = {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,
+‘required’: False</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+<dt>class HubListNestedSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">hub = HubsShortSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = RateLeg
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘hub’,
+‘leg_num’</div></blockquote>
+<p>)
+extra_kwargs = {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,
+‘required’: False</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+<dt>class ChargesShortSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">hub = HubsNameSerializer(read_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Charges
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘charge’,
+‘tax’,
+# ‘tax_description’,
+‘hub’,
+‘charge_currency’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class BidPageAbChargesSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">hub = HubsNameSerializer(read_only=True)
+tax = QuickbooksTaxesSerializer(read_only=True)
+class Meta:</p>
+<blockquote class="last">
+<div><p>model = AbstractTypeCharges
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘charge’,
+‘tax’,
+‘description’,
+‘hub’,
+‘charge_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+</dd>
+<dt>class BidPageAbChargesPostSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">hub = HubsNameSerializer(read_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractTypeCharges
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘charge’,
+‘tax’,
+# ‘tax_description’,
+‘hub’,
+‘charge_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<blockquote>
+<div><p>tax = QuickbooksTaxesSerializer(read_only=True)</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractTypeCharges
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘charge’,
+‘tax’,
+‘description’,
+‘hub’,
+‘charge_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+</div></blockquote>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class BidPageChargesSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">hub = HubsNameSerializer(read_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Charges
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘charge’,
+‘description’,
+‘tax’,
+# ‘tax_description’,
+‘hub’,
+‘charge_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>}</p>
+<dl class="last docutils">
+<dt>def get_id(self, instance):</dt>
+<dd>return instance.abstract_charge.id</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>class BidPageAbPenaltySerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">tax = QuickbooksTaxesSerializer(read_only=True)
+class Meta:</p>
+<blockquote class="last">
+<div><p>model = AbstractPenalty
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘penalty’,
+‘tax’,
+‘description’,
+‘penalty_type’,
+‘penalty_currency’,
+‘tax_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+</dd>
+<dt>class BidPageAbPenaltyPostSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractPenalty
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘penalty’,
+‘description’,
+‘tax’,
+# ‘tax_description’,
+‘penalty_type’,
+‘penalty_currency’,
+‘tax_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<blockquote>
+<div><dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractPenalty
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘penalty’,
+‘tax’,
+‘description’,
+‘penalty_type’,
+‘penalty_currency’,
+‘tax_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+</div></blockquote>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class BidPagePenaltySerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">description = serializers.CharField(source=’abstract_penalty.description’, read_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Penalty
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘penalty’,
+‘tax’,
+‘description’,
+# ‘tax_description’,
+‘penalty_type’,
+‘penalty_currency’,
+‘tax_currency’,</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False,</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>}</p>
+<dl class="last docutils">
+<dt>def get_id(self, instance):</dt>
+<dd>return instance.abstract_penalty.id</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>class PenaltyShortSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Penalty
+fields = (</p>
+<blockquote>
+<div>‘penalty’,
+‘tax’,
+# ‘tax_description’,
+‘penalty_type’,
+‘penalty_currency’,
+‘tax_currency’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class AbstractPenaltySerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractPenalty
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘penalty’,
+‘tax’,
+‘stakeholder_type’,
+‘for_abtask’,
+# ‘tax_description’,
+‘penalty_type’,
+‘penalty_currency’,
+‘tax_currency’,
+‘mark_up’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class RatesSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">charges = BidPageAbChargesPostSerializer(many=True, source=’get_charges’)
+penalties = BidPageAbPenaltyPostSerializer(many=True, source=’get_penalties’, write_only=True)
+hub_list = HubListSerializer(many=True, source=’get_rate_legs’, write_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Rates
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘is_return’,
+‘provider_rate’,
+‘provided_rate’,
+‘tax’,
+# ‘tax_description’,
+‘mode’,
+‘asset’,
+‘rate_for_date’,
+‘rate_type’,
+‘service_provider’,
+‘for_stakeholder’,
+‘rate_expiry_date’,
+‘hub_list’,
+‘num_assets’,
+‘weight’,
+‘tax_currency’,
+‘provider_rate_currency’,
+‘provided_rate_currency’,
+‘charges’,
+‘penalties’,
+‘is_import’,
+‘is_cancelled’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def create(self, validated_data):</dt>
+<dd><p class="first">hub_lists = validated_data.pop(‘get_rate_legs’)
+ab_charges_data = validated_data.pop(‘get_charges’)
+ab_penalties_data = validated_data.pop(‘get_penalties’)</p>
+<dl class="docutils">
+<dt>validated_data[‘mode’] = Modes.objects.filter(dynamic_table__table_name=settings.VENDOR_MODES[</dt>
+<dd>self.context[‘stakeholder’].dynamic_table.table_name]).first()</dd>
+<dt>if ‘rate_type’ in validated_data:</dt>
+<dd><dl class="first last docutils">
+<dt>if validated_data[‘rate_type’] == Rates.RATE_TYPE_SPOT:</dt>
+<dd>validated_data[‘rate_expiry_date’] = validated_data[‘rate_for_date’] + timezone.timedelta(days=7)</dd>
+</dl>
+</dd>
+<dt>if settings.STAKEHOLDER_TYPE[</dt>
+<dd>self.context[‘request’].user.stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_VENDOR:
+validated_data[‘service_provider_id’] = self.context[‘request’].user.stakeholder.id</dd>
+</dl>
+<p>validated_data[‘provided_rate’] = validated_data[‘provider_rate’]
+validated_data[‘provided_rate_currency’] = validated_data[‘provider_rate_currency’]
+rate=Rates.objects.create (tax_id=‘4d1e7975-8c0c-4f03-91c9-afae63a936af’, <a href="#id1"><span class="problematic" id="id2">**</span></a>validated_data)</p>
+<p>WinningBids.update_winning_bids(rate)</p>
+<dl class="docutils">
+<dt>for hub_list in hub_lists:</dt>
+<dd><dl class="first docutils">
+<dt>RateLeg.objects.create(</dt>
+<dd>rate=rate,
+<a href="#id3"><span class="problematic" id="id4">**</span></a>hub_list</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>stakeholder = self.context[‘stakeholder’]</p>
+<p>ab_charges_dict = {str(x[“id”]): x for x in ab_charges_data}
+ab_penalties_dict = {str(x[“id”]): x for x in ab_penalties_data}</p>
+<dl class="docutils">
+<dt>for ab_charge in AbstractTypeCharges.objects.filter(  # &#64;TODO: convert to a single sql statement</dt>
+<dd>pk__in=ab_charges_dict.keys()</dd>
+<dt>):</dt>
+<dd><p class="first">curr_ab_charge_data = ab_charges_dict[str(ab_charge.id)]</p>
+<dl class="docutils">
+<dt>charge = ab_charge.create_charge(</dt>
+<dd>created_by=stakeholder,
+charge=curr_ab_charge_data[‘charge’],
+tax=curr_ab_charge_data[‘tax’],
+charge_currency=curr_ab_charge_data[‘charge_currency’]</dd>
+</dl>
+<p>)
+ChargeForRate.objects.create(</p>
+<blockquote>
+<div>rate=rate,
+charge=charge</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>for ab_penalty in AbstractPenalty.objects.filter(  # &#64;TODO: convert to a single sql statement</dt>
+<dd>pk__in=[x[‘id’] for x in ab_penalties_data]</dd>
+<dt>):</dt>
+<dd><p class="first">curr_ab_penalty_data = ab_penalties_dict[str(ab_penalty.id)]</p>
+<dl class="docutils">
+<dt>penalty = ab_penalty.create_penalty(</dt>
+<dd>penalty=curr_ab_penalty_data[‘penalty’],
+tax=curr_ab_penalty_data[‘tax’],
+penalty_currency=curr_ab_penalty_data[‘penalty_currency’],
+tax_currency=curr_ab_penalty_data[‘tax_currency’]</dd>
+</dl>
+<p>)
+PenaltyForRate.objects.create(</p>
+<blockquote>
+<div>rate=rate,
+penalty=penalty</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">return rate</p>
+</dd>
+<dt>def update(self, instance, validated_data):</dt>
+<dd><p class="first">hub_lists = validated_data.pop(‘get_rate_legs’)
+ab_charges_data = validated_data.pop(‘get_charges’)
+ab_penalties_data = validated_data.pop(‘get_penalties’)</p>
+<p>validated_data[‘provided_rate’] = validated_data[‘provider_rate’]
+validated_data[‘provided_rate_currency’] = validated_data[‘provider_rate_currency’]</p>
+<p>rate = instance
+for key, value in validated_data.iteritems():</p>
+<blockquote>
+<div>setattr(rate, key, value)</div></blockquote>
+<p>rate.save()</p>
+<p>rate_leg_list = RateLeg.objects.filter(rate=rate)</p>
+<p>rate_leg_ids = []</p>
+<dl class="docutils">
+<dt>for hub_list in hub_lists:</dt>
+<dd><dl class="first last docutils">
+<dt>if ‘id’ in hub_list:</dt>
+<dd><p class="first">rate_leg_ids.append(hub_list[‘id’])
+rate_leg = rate_leg_list.get(pk=hub_list[‘id’])
+for key in hub_list:</p>
+<blockquote>
+<div>setattr(rate_leg, key, hub_list[key])</div></blockquote>
+<p class="last">rate_leg.save()</p>
+</dd>
+<dt>else:</dt>
+<dd><dl class="first docutils">
+<dt>rate_leg = RateLeg.objects.create(</dt>
+<dd>rate=rate,
+<a href="#id5"><span class="problematic" id="id6">**</span></a>hub_list</dd>
+</dl>
+<p class="last">)
+rate_leg_ids.append(rate_leg.id)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>rate_leg_list.exclude(id__in=rate_leg_ids).delete()</p>
+<p>WinningBids.update_winning_bids(rate)</p>
+<p>stakeholder = self.context[‘stakeholder’]</p>
+<p>ab_charges_dict = {str(x[“id”]): x for x in ab_charges_data}
+ab_penalties_dict = {str(x[“id”]): x for x in ab_penalties_data}</p>
+<dl class="docutils">
+<dt>Charges.objects.filter(</dt>
+<dd>abstract_charge__pk__in=ab_charges_dict.keys(),
+chargeforrate__rate=rate</dd>
+</dl>
+<p>).delete()</p>
+<dl class="docutils">
+<dt>for ab_charge in AbstractTypeCharges.objects.filter(  # &#64;TODO: convert to a single sql statement</dt>
+<dd>pk__in=ab_charges_dict.keys()</dd>
+<dt>):</dt>
+<dd><p class="first">curr_ab_charge_data = ab_charges_dict[str(ab_charge.id)]</p>
+<dl class="docutils">
+<dt>charge = ab_charge.create_charge(</dt>
+<dd>created_by=stakeholder,
+charge=curr_ab_charge_data[‘charge’],
+tax=curr_ab_charge_data[‘tax’],
+charge_currency=curr_ab_charge_data[‘charge_currency’]</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>ChargeForRate.objects.create(</dt>
+<dd>rate=rate,
+charge=charge</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>Penalty.objects.filter(</dt>
+<dd>abstract_penalty__pk__in=ab_penalties_dict.keys(),
+penaltyforrate__rate=rate</dd>
+</dl>
+<p>).delete()
+for ab_penalty in AbstractPenalty.objects.filter(  # &#64;TODO: convert to a single sql statement</p>
+<blockquote>
+<div>pk__in=[str(x[‘id’]) for x in ab_penalties_data]</div></blockquote>
+<dl class="docutils">
+<dt>):</dt>
+<dd><p class="first">curr_ab_penalty_data = ab_penalties_dict[str(ab_penalty.id)]</p>
+<dl class="docutils">
+<dt>penalty = ab_penalty.create_penalty(</dt>
+<dd>penalty=curr_ab_penalty_data[‘penalty’],
+tax=curr_ab_penalty_data[‘tax’],
+penalty_currency=curr_ab_penalty_data[‘penalty_currency’],
+tax_currency=curr_ab_penalty_data[‘tax_currency’]</dd>
+</dl>
+<p>)
+PenaltyForRate.objects.create(</p>
+<blockquote>
+<div>rate=rate,
+penalty=penalty</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">return rate</p>
+</dd>
+</dl>
+</dd>
+<dt>class ContractsSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">charges = BidPageAbChargesSerializer(many=True, source=’get_charges’)
+penalties = BidPageAbPenaltySerializer(many=True, source=’get_penalties’)
+hub_list = HubListNestedSerializer(many=True, source=’get_rate_legs’)
+asset = AssetsSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Rates
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘is_return’,
+‘provider_rate’,
+‘provided_rate’,
+‘tax’,
+# ‘tax_description’,
+‘mode’,
+‘asset’,
+‘rate_for_date’,
+‘rate_type’,
+‘service_provider’,
+‘for_stakeholder’,
+‘rate_expiry_date’,
+‘hub_list’,
+‘num_assets’,
+‘weight’,
+‘tax_currency’,
+‘provider_rate_currency’,
+‘provided_rate_currency’,
+‘charges’,
+‘penalties’,
+‘is_import’,
+‘is_cancelled’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p># class ShipmentRate(serializers.ModelSerializer):
+#     class Meta:
+#         model = Rates
+#         fields = (
+#             ‘id’,
+#             ‘is_return’,
+#             ‘rate’,
+#             ‘rate_for_date’,
+#             ‘rate_type’,
+#             ‘rate_expiry_date’,
+#             ‘for_leg’
+#         )
+#
+#     def validate_leg(self, leg_id):
+#         try:
+#             leg = ShipmentLeg.objects.get(pk=leg_id)
+#         except ShipmentLeg.DoesNotExist:
+#             raise serializers.ValidationError(‘Leg does exist’)
+#
+#         return leg
+#
+#     def create(self, validated_data):
+#         validated_data[‘stakeholder’] = self.context[‘request’].user.stakeholder
+#         rate = Rates.objects.create(<a href="#id7"><span class="problematic" id="id8">**</span></a>validated_data)
+#         return rate</p>
+<dl class="docutils">
+<dt>class ChargeDescriptionSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = ChargeDescription
+fields = (</p>
+<blockquote>
+<div>‘code’,
+‘description’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p># class PenaltySerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Penalty
+#         fields = (
+#             ‘penalty’,
+#             ‘stakeholder’,
+#             ‘for_abtask’,
+#             ‘tax’,
+#             ‘tax_description’,
+#             ‘penalty_type’,
+#             ‘penalty_currency’,
+#             ‘tax_currency’,
+#         )
+#
+#
+# class AbstractTaskPenaltiesRUDSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Penalty
+#         fields = (
+#             ‘penalty’,
+#             ‘stakeholder’,
+#             ‘for_abtask’,
+#             ‘tax’,
+#             ‘tax_description’,
+#             ‘penalty_type’,
+#             ‘penalty_currency’,
+#             ‘tax_currency’,
+#         )</p>
+<dl class="docutils">
+<dt>class RatesDetailedSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">hub_list = HubListRetrieveSerializer(many=True, source=’get_rate_legs’)
+service_provider = StakeholderDetailSerializer()
+charges = BidPageAbChargesSerializer(many=True, source=’get_charges’)
+penalties = BidPageAbPenaltySerializer(many=True, source=’get_penalties’)
+total_charge = serializers.DecimalField(max_digits=16, decimal_places=2, source=’get_total_charge’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Rates
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘is_return’,
+‘provider_rate’,
+‘provided_rate’,
+‘tax’,
+# ‘tax_description’,
+‘mode’,
+‘asset’,
+‘weight’,
+‘num_assets’,
+‘used_assets’,
+‘rate_for_date’,
+‘rate_type’,
+‘service_provider’,
+‘for_stakeholder’,
+‘rate_expiry_date’,
+‘hub_list’,
+‘tax_currency’,
+‘provider_rate_currency’,
+‘provided_rate_currency’,
+‘charges’,
+‘penalties’,
+‘total_charge’,
+‘is_cancelled’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class ChargesLCSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Charges
+fields = (</p>
+<blockquote>
+<div>‘charge’,
+‘tax’,
+# ‘tax_description’,
+‘charge_for_date’,
+‘mode’,
+‘asset’,
+‘charge_type’,
+# ‘stakeholder’,
+‘payee_type’,
+‘payer_type’,
+‘description’,
+‘hub’,
+‘charge_currency’,
+‘tax_currency’,
+‘mark_up’,
+‘created_by’,
+‘abstract_charge’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p># class AbstractChargesSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = AbstractTypeCharges
+#         fields = (
+#             ‘id’,
+#             ‘charge’,
+#             ‘tax’,
+#             ‘tax_description’,
+#             ‘charge_for_date’,
+#             ‘mode’,
+#             ‘asset’,
+#             ‘charge_type’,
+#             ‘payee_type’,
+#             ‘payer_type’,
+#             ‘description’,
+#             ‘hub’,
+#             ‘charge_currency’,
+#             ‘tax_currency’,
+#         )
+#
+#     def to_representation(self, instance):
+#         result = super(AbstractChargesSerializer, self).to_representation(instance)
+#         if instance.hub:
+#             result[‘hub’] = instance.hub.name
+#         else:
+#             result[‘hub’] = None
+#
+#         return result</p>
+<dl class="docutils">
+<dt>class ChargesSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first"># total_charge = serializers.SerializerMethodField(‘get_total_charge’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Charges
+fields = (</p>
+<blockquote>
+<div>‘charge’,
+‘tax’,
+# ‘tax_description’,
+‘charge_for_date’,
+‘mode’,
+‘asset’,
+‘charge_type’,
+‘stakeholder’,
+‘payee_type’,
+‘payer_type’,
+‘description’,
+‘hub’,
+‘get_total_charge’,
+‘charge_currency’,
+‘tax_currency’,
+‘mark_up’,
+‘created_by’,
+‘abstract_charge’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class WinningBidsSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">rate = RatesSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = WinningBids
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘rate’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class AbstractTypeChargesSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractTypeCharges
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘charge’,
+‘tax’,
+# ‘tax_description’,
+‘charge_for_date’,
+‘mode’,
+‘asset’,
+‘charge_type’,
+‘payee_type’,
+‘payer_type’,
+‘description’,
+‘hub’,
+‘charge_currency’,
+‘tax_currency’,
+‘mark_up’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def to_representation(self, instance):</dt>
+<dd><p class="first">data = super(AbstractTypeChargesSerializer, self).to_representation(instance)</p>
+<p>to_currency = self.context.get(‘to_currency’, ‘INR’)
+converted_rate= ExchangeRateHelper.convert_currency(instance.charge_currency,to_currency,instance.charge)</p>
+<p class="last">data[‘charge’] =converted_rate
+data[‘charge_currency’] = to_currency
+return data</p>
+</dd>
+</dl>
+</dd>
+<dt>class RateBidSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">charges = BidPageAbChargesSerializer(many=True)
+penalties = BidPageAbPenaltySerializer(many=True)
+hub_list = HubListSerializer(many=True, source=’get_rate_legs’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Rates
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘is_return’,
+‘provider_rate’,
+‘provided_rate’,
+‘tax’,
+# ‘tax_description’,
+‘mode’,
+‘asset’,
+‘rate_for_date’,
+‘rate_type’,
+‘service_provider’,
+‘for_stakeholder’,
+‘rate_expiry_date’,
+‘hub_list’,
+‘num_assets’,
+‘weight’,
+‘tax_currency’,
+‘provider_rate_currency’,
+‘provided_rate_currency’,
+‘charges’,
+‘penalties’,
+‘is_cancelled’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_charges(self):</dt>
+<dd>return Charges.objects.filter(chargeforrate__rate=self.instance)</dd>
+<dt>def get_penalties(self):</dt>
+<dd>return Penalty.objects.filter(penaltyforrate__rate=self.instance)</dd>
+<dt>def create(self, validated_data):</dt>
+<dd>return</dd>
+</dl>
+</dd>
+<dt>class ContractChargesSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = ContractCharges
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘charge’,
+‘tax’,
+# ‘tax_description’,
+‘charge_for_date’,
+‘mode’,
+‘asset’,
+‘charge_type’,
+# ‘stakeholder’,
+‘payee’,
+‘payer’,
+‘rate’,
+‘description’,
+‘hub’,
+‘charge_currency’,
+‘tax_currency’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class ContractRateSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">charges = BidPageAbChargesSerializer()</p>
+<p># penalties = AbstractPenaltySerializer(many=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Rates
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘is_return’,
+‘provider_rate’,
+‘provided_rate’,
+‘tax’,
+# ‘tax_description’,
+‘mode’,
+‘asset’,
+‘rate_for_date’,
+‘rate_type’,
+‘service_provider’,
+‘for_stakeholder’,
+‘rate_expiry_date’,
+‘hub_list’,
+‘num_assets’,
+‘weight’,
+‘tax_currency’,
+‘provider_rate_currency’,
+‘provided_rate_currency’,
+‘charges’,
+‘is_cancelled’,
+# ‘penalties’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class VendorBidChargesPenaltyRetrieveSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">latest_charges = serializers.SerializerMethodField()
+charges = serializers.SerializerMethodField()
+latest_penalties = serializers.SerializerMethodField()
+penalties = serializers.SerializerMethodField()</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘latest_charges’,
+‘charges’,
+‘latest_penalties’,
+‘penalties’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_latest_charges(self, instance):</dt>
+<dd><dl class="first docutils">
+<dt>queryset = AbstractTypeCharges.objects.filter(</dt>
+<dd>child_charge__appliedcharges__booking__service_provider=self.context[‘stakeholder’],
+child_charge__appliedcharges__booking__legs__in=instance.get_selected_route_legs(),</dd>
+</dl>
+<p>).distinct()</p>
+<p class="last">return BidPageAbChargesTaxSerializer(queryset, many=True).data</p>
+</dd>
+<dt>def get_charges(self, instance):</dt>
+<dd><p class="first">hub_list = instance.get_hub_list()</p>
+<p>show_for_stk = ‘’
+if self.context[‘stakeholder’].dynamic_table.table_name == settings.STAKEHOLDER_IDENTIFIERS[‘SHIPPER’]:</p>
+<blockquote>
+<div>show_for_stk = Charges.SHOW_FOR_STAKEHOLDER_SHIPPER</div></blockquote>
+<dl class="docutils">
+<dt>elif self.context[‘stakeholder’].dynamic_table.table_name == settings.STAKEHOLDER_IDENTIFIERS[‘SHIPPING_LINE’]:</dt>
+<dd>show_for_stk = Charges.SHOW_FOR_STAKEHOLDER_FORWARDER</dd>
+<dt>elif self.context[‘stakeholder’].dynamic_table.table_name == settings.STAKEHOLDER_IDENTIFIERS[‘TRUCKER’]:</dt>
+<dd>show_for_stk = Charges.SHOW_FOR_STAKEHOLDER_TRANSPORTER</dd>
+</dl>
+<p class="last">query_set = AbstractTypeCharges.objects.filter(hub__in=hub_list, show_for_stakeholder=show_for_stk).distinct()
+return BidPageAbChargesTaxSerializer(query_set, many=True).data</p>
+</dd>
+</dl>
+<p>def get_latest_penalties(self, instance):</p>
+<blockquote>
+<div><p>query_set = AbstractPenalty.objects.none()</p>
+<dl class="docutils">
+<dt>if settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.context[‘stakeholder’].dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_CUSTOMER:</p>
+<dl class="docutils">
+<dt>query_set = AbstractPenalty.objects.filter(</dt>
+<dd>child_penalty__penalty_cp_booking__cp_booking__quote__stakeholder=self.context[‘stakeholder’]</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+<dt>elif settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.context[‘stakeholder’].dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_VENDOR:</p>
+<dl class="docutils">
+<dt>query_set = AbstractPenalty.objects.filter(</dt>
+<dd>child_penalty__penalty_booking__booking__service_provider=self.context[‘stakeholder’]</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+</dl>
+<p>return BidPageAbPenaltyTaxSerializer(query_set, many=True).data</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def get_penalties(self, instance):</dt>
+<dd><dl class="first docutils">
+<dt>query_set = AbstractPenalty.objects.filter(</dt>
+<dd>stakeholder_type=self.context[‘stakeholder’].dynamic_table</dd>
+</dl>
+<p>)</p>
+<p class="last">return BidPageAbPenaltyTaxSerializer(query_set, many=True).data</p>
+</dd>
+</dl>
+</dd>
+<dt>class VendorBidChargesPenaltyUpdateSerializer(VendorBidChargesPenaltyRetrieveSerializer):</dt>
+<dd><dl class="first docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘latest_charges’,
+‘charges’,
+‘latest_penalties’,
+‘penalties’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_latest_charges(self, instance):</dt>
+<dd><dl class="first docutils">
+<dt>queryset = Charges.objects.filter(</dt>
+<dd>chargeforrate__rate=self.context[‘rate’]</dd>
+</dl>
+<p>).distinct()</p>
+<p class="last">return BidPageChargesSerializer(queryset, many=True).data</p>
+</dd>
+</dl>
+<p>def get_latest_penalties(self, instance):</p>
+<blockquote class="last">
+<div><p>query_set = Penalty.objects.none()</p>
+<dl class="docutils">
+<dt>if settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.context[‘stakeholder’].dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_CUSTOMER:</p>
+<dl class="docutils">
+<dt>query_set = Penalty.objects.filter(</dt>
+<dd>penaltyforrate__rate=self.context[‘rate’]</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+<dt>elif settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.context[‘stakeholder’].dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_VENDOR:</p>
+<dl class="docutils">
+<dt>query_set = Penalty.objects.filter(</dt>
+<dd>penaltyforrate__rate=self.context[‘rate’]</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+</dl>
+<p>return BidPagePenaltySerializer(query_set, many=True).data</p>
+</div></blockquote>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="r-model.html"
+                        title="previous chapter">rates.models</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="t-view.html"
+                        title="next chapter">task.views</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/r-serializer.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="t-view.html" title="task.views"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="r-model.html" title="rates.models"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

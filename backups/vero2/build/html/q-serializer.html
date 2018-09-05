@@ -1,0 +1,614 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>quote.serializer &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="rates.views" href="r-view.html" />
+    <link rel="prev" title="quote.models" href="q-model.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="r-view.html" title="rates.views"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="q-model.html" title="quote.models"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="quote-serializer">
+<h1>quote.serializer<a class="headerlink" href="#quote-serializer" title="Permalink to this headline">¶</a></h1>
+<p>from django.conf import settings
+from rest_framework import serializers</p>
+<p>from assets.serializer import AssetsSerializer
+from cp_qb.subusers_helpers import create_quote_subuser
+from helpscout.customer import HSCustomer
+from hubs.serializer import HubsShortSerializer
+from modes.models import Modes
+from modes.serializer import ModesNameSerializer
+from quote.models import Quote, Leg
+from rates.serializer import RatesSerializer, RatesDetailedSerializer
+from shipment.models import Shipment
+from shipment.serializers import ShipmentSerializer
+from stakeholder.serializers import StakeholderRegisterSerializer</p>
+<dl class="docutils">
+<dt>class LegsSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">fromHub = HubsShortSerializer()
+toHub = HubsShortSerializer()
+mode = ModesNameSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Leg
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘mode’,
+‘fromHub’,
+‘toHub’,
+‘leg_num’,
+‘route_num’,
+‘start_date’,
+‘duration’,
+‘rate’,
+‘delay’,
+‘description_text’,
+‘is_import’,
+‘rate_currency’,
+‘is_active’,
+‘arrival_date’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class RouteSelectionLegSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">end_date = serializers.DateTimeField()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Leg
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘leg_num’,
+‘start_date’,
+‘end_date’,
+‘delay’,
+‘is_import’,
+‘arrival_date’</div></blockquote>
+<p>)
+extra_kwargs = {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>‘id’: {</dt>
+<dd>‘read_only’: False</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+<dt>class RouteSelectionQuoteSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">legs = RouteSelectionLegSerializer(many=True, write_only=True)
+route_num = serializers.IntegerField()</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘route_num’,
+‘legs’,
+‘cargo_description’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>def validate_route_num(self, value):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if not Leg.objects.filter(quote_id=self.instance.id, route_num=value).count():</dt>
+<dd>raise serializers.ValidationError(‘Route does not exists’)</dd>
+</dl>
+<p>return value</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def update(self, instance, validated_data):</dt>
+<dd><p class="first"># &#64;TODO: save changes for future leg generation</p>
+<p># create shipments
+for i in range(instance.no_of_containers):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>shipment = Shipment.objects.create(</dt>
+<dd>shipper_quote=instance,
+shipment_num=i + 1</dd>
+</dl>
+<p>)</p>
+<p># create shipment legs
+for leg in validated_data[‘legs’]:</p>
+<blockquote>
+<div><p>leg[‘duration’] = int((leg[‘end_date’] - leg[‘start_date’]).total_seconds() / 60)
+route_leg = Leg.objects.get(pk=leg[‘id’])</p>
+<dl class="docutils">
+<dt>for key in leg:</dt>
+<dd>setattr(route_leg, key, leg[key])</dd>
+</dl>
+<p>route_leg.save()</p>
+<dl class="docutils">
+<dt>if route_leg.fromHub == instance.source:</dt>
+<dd>instance.for_date = route_leg.start_date</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<p>instance.selected_route_num = validated_data[‘route_num’]
+# instance.for_date = instance.quote_legs.filter(route_num=validated_data[‘route_num’]).order_by(‘leg_num’).first().start_date
+instance.save()</p>
+<p>instance.clone_rates()</p>
+<p class="last">return instance</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">legs = LegsSerializer(many=True, source=’get_legs’, read_only=True)
+num_routes = serializers.IntegerField(source=’get_num_routes’, read_only=True)
+class Meta:</p>
+<blockquote>
+<div><p>model = Quote
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘stakeholder’,
+‘source’,
+‘destination’,
+‘asset’,
+‘for_date’,
+‘for_date_choices’,
+‘weight’,
+‘no_of_containers’,
+‘include_cha’,
+‘is_dock_stuffing’,
+‘stuffing_duration’,
+‘legs’,
+‘num_routes’,
+‘helpscout_id’,
+‘quote_number’,
+‘rate_currency’,
+‘billing_address’,
+‘quickbooks_id’,
+‘cargo_description’</div></blockquote>
+<p>)
+extra_kwargs = {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>“billing_address”: {</dt>
+<dd>“required”: False  # &lt;== make True later</dd>
+</dl>
+<p>},
+“quickbooks_id”: {</p>
+<blockquote>
+<div>“required”: False</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def create(self, validated_data):</dt>
+<dd><p class="first">stakeholder = self.context[‘request’].user.stakeholder
+validated_data[‘stakeholder_id’] = stakeholder.id
+quote = super(QuoteSerializer, self).create(validated_data=validated_data)</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>response, status = HSCustomer().create_customer({</dt>
+<dd><p class="first">‘firstName’: stakeholder.executive_first_name,
+‘lastName’: stakeholder.executive_last_name,
+‘emails’: [</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>{</dt>
+<dd>“value”: self.context[‘request’].user.email.replace(‘&#64;’, ‘+{}&#64;’.format(quote.quote_number)),
+“location”: “work”</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p class="last">],
+‘organization’: str(stakeholder.id)</p>
+</dd>
+</dl>
+<p>})
+if response:</p>
+<blockquote class="last">
+<div>quote.helpscout_id = response[‘id’]
+quote.save()</div></blockquote>
+</dd>
+<dt>except Exception as exc:</dt>
+<dd>pass  # exception_error_message(exc)</dd>
+</dl>
+<p>quote.generate_legs()</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd>create_quote_subuser(quote)</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+<p class="last">return quote</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteListSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">source = HubsShortSerializer()
+destination = HubsShortSerializer()
+stakeholder = StakeholderRegisterSerializer()
+asset = AssetsSerializer()
+status = serializers.SerializerMethodField()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘stakeholder’,
+‘source’,
+‘destination’,
+‘asset’,
+‘for_date’,
+‘for_date_choices’,
+‘weight’,
+‘no_of_containers’,
+‘include_cha’,
+‘is_dock_stuffing’,
+‘stuffing_duration’,
+‘helpscout_id’,
+‘selected_route_num’,
+‘quote_number’,
+‘rate_currency’,
+‘cargo_description’,
+‘status’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_status(self,obj):</dt>
+<dd><p class="first">rate_legs = obj.get_rates()
+rate_flag = False
+rate_count = True
+count = 0
+for rate_leg in rate_legs:</p>
+<blockquote>
+<div><p>number_of_asset = 0
+for num_asset in rate_leg[‘rates’]:</p>
+<blockquote>
+<div>number_of_asset +=num_asset.num_assets</div></blockquote>
+<dl class="docutils">
+<dt>if number_of_asset &gt;= obj.no_of_containers:</dt>
+<dd>rate_flag = True</dd>
+<dt>if rate_leg[‘rates’]==[]:</dt>
+<dd>rate_count =False
+count+=1</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>if  rate_count==True and rate_flag==True:</dt>
+<dd>obj.status=Quote.STATUS_COMPLETED</dd>
+<dt>elif (rate_count==False or rate_flag==False) and count&lt;len(rate_legs):</dt>
+<dd>obj.status = Quote.STATUS_PARTIALLY_COMPLETED</dd>
+<dt>elif rate_count == False and rate_flag == False and count==len(rate_legs):</dt>
+<dd>obj.status = Quote.STATUS_PROCESSING</dd>
+</dl>
+<p class="last">return obj.status</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteDetailSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">shipments = ShipmentSerializer(many=True, read_only=True, source=’quote_shipments’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘stakeholder’,
+‘source’,
+‘destination’,
+‘asset’,
+‘rate’,
+‘for_date’,
+‘for_date_choices’,
+‘weight’,
+‘weight_unit’,
+‘shipments’,
+‘no_of_containers’,
+‘include_cha’,
+‘is_dock_stuffing’,
+‘stuffing_duration’,
+‘quote_number’,
+‘rate_currency’,
+‘cargo_description’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteUnConfirmedBookingDetailSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">shipments = ShipmentSerializer(many=True, read_only=True, source=’quote_shipments’)
+source = HubsShortSerializer()
+destination = HubsShortSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘stakeholder’,
+‘source’,
+‘destination’,
+‘asset’,
+‘rate’,
+‘for_date’,
+‘for_date_choices’,
+‘weight’,
+‘weight_unit’,
+‘shipments’,
+‘no_of_containers’,
+‘include_cha’,
+‘is_dock_stuffing’,
+‘stuffing_duration’,
+‘quote_number’,
+‘rate_currency’,
+‘cargo_description’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteSelectedRouteLegsSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">legs = LegsSerializer(many=True, source=’get_selected_route_legs’, read_only=True)
+num_routes = serializers.IntegerField(source=’get_num_routes’, read_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘stakeholder’,
+‘source’,
+‘destination’,
+‘asset’,
+‘for_date’,
+‘for_date_choices’,
+‘weight’,
+‘no_of_containers’,
+‘include_cha’,
+‘is_dock_stuffing’,
+‘stuffing_duration’,
+‘legs’,
+‘num_routes’,
+‘quote_number’,
+‘rate_currency’,
+‘cargo_description’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class LegWithNoOfContainersSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">no_of_containers = QuoteSerializer(many=True, source=’get_legs’, read_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Leg
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘mode’,
+‘asset’,
+‘fromHub’,
+‘toHub’,
+‘start_date’,
+‘duration’,
+‘delay’,
+‘description_text’,
+‘leg_num’,
+‘route_num’,
+‘rate’,
+‘is_import’,
+‘rate_currency’,
+‘is_active’,
+‘arrival_date’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteRatesSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">rate_legs = serializers.SerializerMethodField(‘quote_rate_leg’)
+asset = AssetsSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘stakeholder’,
+‘source’,
+‘destination’,
+‘asset’,
+‘for_date’,
+‘for_date_choices’,
+‘weight’,
+‘no_of_containers’,
+‘include_cha’,
+‘is_dock_stuffing’,
+‘stuffing_duration’,
+‘rate_legs’,
+‘quote_number’,
+‘rate_currency’,
+‘cargo_description’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def quote_rate_leg(self, obj):</dt>
+<dd><p class="first">result = []</p>
+<p>rate_legs = obj.get_rates()</p>
+<dl class="docutils">
+<dt>for rate_leg in rate_legs:</dt>
+<dd><dl class="first docutils">
+<dt>curr_row = {</dt>
+<dd>‘legs’: LegsSerializer(rate_leg[‘legs’], many=True).data,
+‘rates’: RatesDetailedSerializer(rate_leg[‘rates’], many=True).data,</dd>
+</dl>
+<p class="last">}
+result.append(curr_row)</p>
+</dd>
+</dl>
+<p class="last">return result</p>
+</dd>
+</dl>
+</dd>
+<dt>class VendorQuoteRequirementListSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">grouped_legs = serializers.SerializerMethodField(‘quote_grouped_legs’)
+mode = serializers.SerializerMethodField(‘mode_for_legs’)
+asset = AssetsSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Quote
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘asset’,
+‘mode’,
+‘for_date’,
+‘for_date_choices’,
+‘weight’,
+‘no_of_containers’,
+‘include_cha’,
+‘is_dock_stuffing’,
+‘stuffing_duration’,
+‘grouped_legs’,
+‘quote_number’,
+‘rate_currency’,
+‘cargo_description’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def quote_grouped_legs(self, obj):</dt>
+<dd><dl class="first docutils">
+<dt>grouped_legs = obj.get_grouped_hub_list(</dt>
+<dd>filter_mode=settings.VENDOR_MODES[self.context[‘request’].user.stakeholder.dynamic_table.table_name]</dd>
+</dl>
+<p>)</p>
+<p>result = []</p>
+<dl class="last docutils">
+<dt>for grouped_leg in grouped_legs:</dt>
+<dd><p class="first"># result.append(HubsShortSerializer(grouped_leg[‘hub_list’], many=True).data)
+# &#64;TODO: split grouped legs for multinational use case (surface)</p>
+<dl class="docutils">
+<dt>quoted_rates = obj.get_vendor_quoted_rate(</dt>
+<dd>vendor_id=self.context[‘request’].user.stakeholder.id,
+grouped_leg=grouped_leg</dd>
+</dl>
+<p>)
+quoted_rate = None
+if len(quoted_rates) &gt; 0:</p>
+<blockquote>
+<div>quoted_rate = RatesSerializer(quoted_rates[0]).data</div></blockquote>
+<dl class="docutils">
+<dt>curr_obj = {</dt>
+<dd>‘hub_list’: HubsShortSerializer(grouped_leg[‘hub_list’], many=True).data,
+‘min_rate’: obj.get_vendors_min_rate(grouped_leg),
+‘min_rate_currency’: ‘INR’,
+‘quoted_rate’: quoted_rate,
+‘is_import’: grouped_leg[‘is_import’],
+‘start_date’: grouped_leg[‘start_date’]</dd>
+</dl>
+<p class="last">}
+result.append(curr_obj)</p>
+</dd>
+<dt>if len(result) &gt; 0:</dt>
+<dd>return result[0]</dd>
+<dt>else:</dt>
+<dd>return None</dd>
+</dl>
+</dd>
+<dt>def mode_for_legs(self, obj):</dt>
+<dd><p class="first">mode_name = settings.VENDOR_MODES[self.context[‘request’].user.stakeholder.dynamic_table.table_name]
+return {</p>
+<blockquote>
+<div>‘id’: Modes.objects.filter(dynamic_table__table_name=mode_name).first().id,
+‘name’: mode_name</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="q-model.html"
+                        title="previous chapter">quote.models</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="r-view.html"
+                        title="next chapter">rates.views</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/q-serializer.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="r-view.html" title="rates.views"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="q-model.html" title="quote.models"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

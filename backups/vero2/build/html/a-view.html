@@ -1,0 +1,196 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>assets.views &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="assets.models" href="a-model.html" />
+    <link rel="prev" title="stakeholder.serializers" href="serializer.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="a-model.html" title="assets.models"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="serializer.html" title="stakeholder.serializers"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="assets-views">
+<h1>assets.views<a class="headerlink" href="#assets-views" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p># Create your views here.
+import json</p>
+<p>import requests
+from django.shortcuts import get_object_or_404
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView</p>
+<p>from assets.models import Assets, LDBTracking, FreightCarrier
+from assets.serializer import AssetsSerializer, AssetsListSerializer, LDBTrackingSerializer, FreightCarrierSerializers
+from cp_eav.generic_model_serializer import serializer_factory
+from utils.metadata import CPMeta</p>
+<dl class="docutils">
+<dt>class AssetsListCreateAPIView(generics.ListCreateAPIView):</dt>
+<dd><p class="first"># pagination_class = CamelportPagination
+metadata_class = CPMeta</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Assets.objects.all()</dd>
+</dl>
+<p class="last">serializer_class = AssetsSerializer</p>
+</dd>
+<dt>class AssetsRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">serializer_class = AssetsSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Assets.objects.all()</dd>
+</dl>
+</dd>
+<dt>class AssetsDynamicValueRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>qs = Assets.objects.all()
+return qs</dd>
+<dt>def get_serializer(self, <a href="#id1"><span class="problematic" id="id2">*</span></a>args, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs):</dt>
+<dd><p class="first">dynamic_table = self.get_object().dynamic_table</p>
+<dl class="docutils">
+<dt>ser = serializer_factory(</dt>
+<dd>mdl=Assets,
+fields=Assets.get_fields_list(),
+dyn_table=dynamic_table,</dd>
+</dl>
+<p class="last">)
+return ser(<a href="#id5"><span class="problematic" id="id6">*</span></a>args, <a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs)</p>
+</dd>
+</dl>
+</dd>
+<dt>class AssetsListAPIView(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = AssetsListSerializer
+pagination_class = None</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Assets.objects.all()</dd>
+</dl>
+</dd>
+<dt>class LDBTrackingRetrieveAPIView(generics.RetrieveAPIView):</dt>
+<dd><p class="first">serializer_class = LDBTrackingSerializer</p>
+<dl class="last docutils">
+<dt>def get_object(self):</dt>
+<dd>return get_object_or_404(LDBTracking, container_no=self.kwargs[‘container_no’])</dd>
+</dl>
+</dd>
+<dt>class MarineTrackingView (APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id9"><span class="problematic" id="id10">*</span></a>args, <a href="#id11"><span class="problematic" id="id12">**</span></a>kwargs):</dt>
+<dd><dl class="first docutils">
+<dt>response=requests.post (</dt>
+<dd>url=’<a class="reference external" href="https://camelport-private-limited.cloud.tyk.io/track/">https://camelport-private-limited.cloud.tyk.io/track/</a>’,
+data=request.data</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>if 199 &lt; response.status_code &lt; 300:</dt>
+<dd>return Response (json.loads (response.text))</dd>
+</dl>
+<p># return json.loads (response.text), response.status_code
+# response_text=json.loads (response.text)</p>
+<p class="last">return Response ({‘text’: response.text.replace (r”’”, “”)}, status=response.status_code)</p>
+</dd>
+</dl>
+</dd>
+<dt>class FreightCarrierAPIView(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = FreightCarrierSerializers
+pagination_class = None
+permission_classes = [IsAuthenticated]</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return FreightCarrier.objects.all()</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="serializer.html"
+                        title="previous chapter">stakeholder.serializers</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="a-model.html"
+                        title="next chapter">assets.models</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/a-view.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="a-model.html" title="assets.models"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="serializer.html" title="stakeholder.serializers"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

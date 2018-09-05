@@ -1,0 +1,507 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>quote.view &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="quote.models" href="q-model.html" />
+    <link rel="prev" title="hubs.serializers" href="h-serializer.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="q-model.html" title="quote.models"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="h-serializer.html" title="hubs.serializers"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="quote-view">
+<h1>quote.view<a class="headerlink" href="#quote-view" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>from django.conf import settings
+from django.db.models.aggregates import Count
+from django.http import Http404
+from django.utils import timezone
+from rest_framework import generics, status, filters
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView</p>
+<p>from notification.helpers import NotificationHelper
+from notification.models import Notification
+from quote import serializers
+from quote.metadata import QuoteMeta
+from quote.models import Quote, Leg
+from stakeholder.models import Stakeholder
+from utils.pagination import CamelportPagination, Camelport15Pagination
+from utils.permissions import VendorOnlyAccessPermission</p>
+<dl class="docutils">
+<dt>class QuoteCreateView(generics.CreateAPIView):</dt>
+<dd><p class="first"># pagination_class = CamelportPagination
+“”“Create Quote by Shipper. Shipping Address(Hub) is compulsory”“”
+metadata_class = QuoteMeta
+permission_classes = [IsAuthenticated, ]</p>
+<p>serializer_class = serializers.QuoteSerializer
+queryset = Quote.objects.all()</p>
+<dl class="last docutils">
+<dt>def create(self, request, <a href="#id1"><span class="problematic" id="id2">*</span></a>args, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs):</dt>
+<dd><p class="first">serializer = self.get_serializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+self.perform_create(serializer)
+headers = self.get_success_headers(serializer.data)</p>
+<p class="last">response = serializer.data
+return Response(response, status=status.HTTP_201_CREATED, headers=headers)</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteListView(generics.ListAPIView):</dt>
+<dd><p class="first">“”“Return a list of all the existing quote. “””
+pagination_class = CamelportPagination
+metadata_class = QuoteMeta
+permission_classes = [IsAuthenticated, ]</p>
+<p>serializer_class = serializers.QuoteListSerializer</p>
+<p>filter_backends = (filters.SearchFilter, filters.OrderingFilter)
+search_fields = (</p>
+<blockquote>
+<div>‘source__name’, ‘destination__name’, ‘quote_number’, ‘for_date’, ‘stakeholder__executive_first_name’,
+‘stakeholder__executive_last_name’)</div></blockquote>
+<p>ordering_fields = (‘for_date’, ‘source__name’, ‘destination__name’)</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return Quote.objects.filter(</dt>
+<dd>stakeholder=self.request.user.stakeholder</dd>
+<dt>).annotate(</dt>
+<dd>cp_booking_count=Count(‘cpbooking’)</dd>
+<dt>).filter(</dt>
+<dd>cp_booking_count=0</dd>
+<dt>).filter(</dt>
+<dd>selected_route_num__isnull=False</dd>
+</dl>
+<p class="last">)  # .order_by(‘-for_date’)</p>
+</dd>
+</dl>
+<p>queryset = Quote.objects.all()</p>
+<p class="last"># filter_backends = (filters.DjangoFilterBackend,filters.OrderingFilter)
+# filter_class = QuoteFilter
+# ordering_fields = (‘for_date’)
+# ordering = (‘-for_date’)</p>
+</dd>
+<dt>class QuoteRUDView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">“””
+get: Return a list of all the existing Quote.,
+put: Update quote with given id,
+patch:Update an existing entity only selected field,
+delete: Delete quote with given id.
+“””
+serializer_class = serializers.QuoteSerializer</p>
+<p># permission_classes = [IsAuthenticated, ]
+def get_object(self):</p>
+<blockquote>
+<div><p>queryset = self.get_queryset()</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>pk=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>quote_number=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+<p>raise Http404</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Quote.objects.all()</dd>
+</dl>
+</dd>
+</dl>
+<p># class QuoteDetailRetrieveView(generics.RetrieveAPIView):
+#     serializer_class = serializers.QuoteDetailSerializer
+#     permission_classes = [IsAuthenticated, ]
+#
+#     def get_object(self):
+#         queryset = self.get_queryset()
+#
+#         try:
+#             return queryset.get(
+#                 pk=self.kwargs[‘pk’]
+#             )
+#         except:
+#             pass
+#
+#         try:
+#             return queryset.get(
+#                 quote_number=self.kwargs[‘pk’]
+#             )
+#         except:
+#             pass
+#
+#         raise Http404
+#
+#     def get_queryset(self):
+#         return Quote.objects.filter(stakeholder=self.request.user.stakeholder)</p>
+<dl class="docutils">
+<dt>class RouteSelectionUpdateView(generics.UpdateAPIView):</dt>
+<dd><p class="first">“”“It shows route(collection of hub) for created quote.”“”
+serializer_class = serializers.RouteSelectionQuoteSerializer
+permission_classes = [IsAuthenticated, ]</p>
+<dl class="docutils">
+<dt>def get_object(self):</dt>
+<dd><p class="first">queryset = self.get_queryset()</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>pk=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>except queryset.model.DoesNotExist:</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>quote_number=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>except queryset.model.DoesNotExist:</dt>
+<dd>raise Http404</dd>
+</dl>
+</div></blockquote>
+</dd>
+<dt>def get_queryset(self):</dt>
+<dd>return Quote.objects.filter(stakeholder=self.request.user.stakeholder).filter(selected_route_num=None)</dd>
+</dl>
+<p># queryset = Quote.objects.filter(selected_route_num=None)</p>
+<dl class="last docutils">
+<dt>def update(self, request, <a href="#id5"><span class="problematic" id="id6">*</span></a>args, <a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs):</dt>
+<dd><p class="first">partial = kwargs.pop(‘partial’, False)
+instance = self.get_object()
+serializer = self.get_serializer(instance, data=request.data, partial=partial)
+serializer.is_valid(raise_exception=True)
+self.perform_update(serializer)</p>
+<dl class="docutils">
+<dt>if getattr(instance, ‘_prefetched_objects_cache’, None):</dt>
+<dd># If ‘prefetch_related’ has been applied to a queryset, we need to
+# forcibly invalidate the prefetch cache on the instance.
+instance._prefetched_objects_cache = {}</dd>
+</dl>
+<p>response_serializer = serializers.QuoteSelectedRouteLegsSerializer(instance=instance)</p>
+<p>self.generate_vendor_notifications(instance=instance)</p>
+<p>self.generate_customer_notification(instance=instance)</p>
+<p class="last">return Response({})</p>
+</dd>
+<dt>def generate_vendor_notifications(self, instance):</dt>
+<dd><dl class="first docutils">
+<dt>sender_list = Stakeholder.objects.filter(</dt>
+<dd>dynamic_table__table_name__in=instance.get_involved_vendor_types(),
+whatsapp_number__isnull=False  # &#64;TODO: delete this filter</dd>
+</dl>
+<p>)</p>
+<p>for_date_str = instance.for_date.strftime(“%d/%m/%Y”)</p>
+<dl class="docutils">
+<dt>msg_short = ‘{source} - {destination} <span class="classifier-delimiter">:</span> <span class="classifier">{date}’.format(</span></dt>
+<dd>source=instance.source.code or instance.source.name,
+destination=instance.destination.code or instance.destination.name,
+date=for_date_str</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>msg_long = ‘{num_assets} containers of {asset_type} required for route :n{route}nnFor Date: {date}’.format(</dt>
+<dd><p class="first">num_assets=instance.no_of_containers,
+asset_type=”{feet}’ {identifier}”.format(</p>
+<blockquote>
+<div>identifier=instance.asset.identifier,
+feet=instance.asset.length</div></blockquote>
+<p class="last">),
+route=instance.get_route_str(),
+date=for_date_str</p>
+</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>NotificationHelper.send_notification(</dt>
+<dd>sender_list=sender_list,
+title=’New Quote Request’,
+message_long=msg_long,
+message_short=msg_short,
+object_id=str (instance.id),
+notification_type=Notification.NOTIFICATION_TYPE_VENDOR_BID,
+send_email=True</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>def generate_customer_notification(self, instance):</dt>
+<dd><p class="first">for_date_str = instance.for_date.strftime(“%d/%m/%Y”)</p>
+<dl class="docutils">
+<dt>msg_short = ‘{source} - {destination} <span class="classifier-delimiter">:</span> <span class="classifier">{date}’.format(</span></dt>
+<dd>source=instance.source.name,
+destination=instance.destination.name,
+date=for_date_str</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>msg_long = ‘Quote Request accepted for {num_assets} containers of {asset_type} for route {route} dated {date}’.format(</dt>
+<dd><p class="first">num_assets=instance.no_of_containers,
+asset_type=”{feet}’ {identifier}”.format(</p>
+<blockquote>
+<div>identifier=instance.asset.identifier,
+feet=instance.asset.length</div></blockquote>
+<p class="last">),
+route=instance.get_route_str(),
+date=for_date_str</p>
+</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>NotificationHelper.send_notification(</dt>
+<dd>sender_list=[instance.stakeholder, ],
+title=’New RFQ Generated’,
+message_long=msg_long,
+message_short=msg_short,
+object_id=str (instance.id),
+notification_type=Notification.NOTIFICATION_TYPE_SHIPPER_QUOTE,
+send_email=True</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteSelectedRouteLegsView(generics.RetrieveAPIView):</dt>
+<dd><p class="first">serializer_class = serializers.QuoteSelectedRouteLegsSerializer
+permission_classes = [IsAuthenticated, ]</p>
+<dl class="last docutils">
+<dt>def get_object(self):</dt>
+<dd><p class="first">queryset = self.get_queryset()</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>pk=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>except queryset.model.DoesNotExist:</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>quote_number=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>except queryset.model.DoesNotExist:</dt>
+<dd>raise Http404</dd>
+</dl>
+</div></blockquote>
+</dd>
+<dt>def get_queryset(self):</dt>
+<dd>return Quote.objects.filter(stakeholder=self.request.user.stakeholder)</dd>
+</dl>
+</dd>
+<dt>class QuoteLegListCreateView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">serializer_class = serializers.LegWithNoOfContainersSerializer
+permission_classes = [IsAuthenticated, ]</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><p class="first">stakeholder = self.request.user.stakeholder
+legs = Leg.objects.filter(</p>
+<blockquote>
+<div>mode__dynamic_table__table_name=settings.VENDOR_MODES[stakeholder.dynamic_table.table_name]</div></blockquote>
+<dl class="docutils">
+<dt>).filter(</dt>
+<dd>quote__stakeholder=stakeholder</dd>
+</dl>
+<p>)</p>
+<p class="last">return legs</p>
+</dd>
+</dl>
+</dd>
+<dt>class QuoteRatesListView(generics.RetrieveAPIView):</dt>
+<dd><p class="first">serializer_class = serializers.QuoteRatesSerializer</p>
+<p># permission_classes = [IsAuthenticated, ]
+def get_object(self):</p>
+<blockquote>
+<div><p>queryset = self.get_queryset()</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>quote_number=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>except queryset.model.DoesNotExist:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first docutils">
+<dt>return queryset.get(</dt>
+<dd>pk=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>except queryset.model.DoesNotExist:</dt>
+<dd>raise Http404</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Quote.objects.all()</dd>
+</dl>
+</dd>
+<dt>class VendorQuoteRequirementListView(generics.ListAPIView):</dt>
+<dd><p class="first">“”“Return Quote list for bid”“”
+serializer_class = serializers.VendorQuoteRequirementListSerializer
+permission_classes = [VendorOnlyAccessPermission, ]
+pagination_class = Camelport15Pagination</p>
+<p>filter_backends = (filters.SearchFilter , filters.OrderingFilter)
+search_fields = (‘weight’ ,)
+ordering_fields = (‘quote_number’, ‘weight’)</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><p class="first"># &#64;TODO: filter by country for trucker
+v = Quote.objects.filter(</p>
+<blockquote>
+<div><p>for_date__gt=timezone.now(),
+selected_route_num__isnull=False,
+quote_legs__mode__dynamic_table__table_name=settings.VENDOR_MODES[</p>
+<blockquote>
+<div>self.request.user.stakeholder.dynamic_table.table_name],</div></blockquote>
+<p>cpbooking__isnull=True</p>
+</div></blockquote>
+<p>).distinct() #.order_by(‘for_date’)</p>
+<p class="last">return v</p>
+</dd>
+</dl>
+</dd>
+<dt>class VendorDashboard(APIView):</dt>
+<dd><p class="first">permission_classes = [VendorOnlyAccessPermission, ]</p>
+<dl class="last docutils">
+<dt>def get(self, request, <a href="#id9"><span class="problematic" id="id10">*</span></a>args, <a href="#id11"><span class="problematic" id="id12">**</span></a>kwargs):</dt>
+<dd><dl class="first docutils">
+<dt>response_dict = {</dt>
+<dd>‘winning_bids’: [],
+‘losing_bids’: [],</dd>
+</dl>
+<p>}</p>
+<p class="last">return Response(response_dict)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>## creating new quote-QuoteRetrieveUpdateDestroyAPIView
+class QuoteRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</p>
+<blockquote>
+<div><p>pagination_class = None
+metadata_class = QuoteMeta
+permission_classes = [IsAuthenticated, ]</p>
+<p>serializer_class = serializers.QuoteSerializer</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Quote.objects.all()</dd>
+</dl>
+</div></blockquote>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="h-serializer.html"
+                        title="previous chapter">hubs.serializers</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="q-model.html"
+                        title="next chapter">quote.models</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/q-view.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="q-model.html" title="quote.models"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="h-serializer.html" title="hubs.serializers"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

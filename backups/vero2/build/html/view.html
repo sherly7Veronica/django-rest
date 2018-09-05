@@ -1,0 +1,881 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>stakeholder.views &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="stakeholder.models" href="model.html" />
+    <link rel="prev" title="Stakeholder" href="stakeholder.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="model.html" title="stakeholder.models"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="stakeholder.html" title="Stakeholder"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="stakeholder-views">
+<h1>stakeholder.views<a class="headerlink" href="#stakeholder-views" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-</p>
+<p>from __future__ import unicode_literals</p>
+<p>import json
+from random import randint</p>
+<p>import requests
+from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from django.http import Http404
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, status
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView</p>
+<p>from cp_eav.generic_model_serializer import serializer_factory
+from cp_eav.models import DynamicTable
+from cp_eav.serializer import DynamicTableSerializer
+from stakeholder import serializers as stakeholder_serializers
+from stakeholder.models import Stakeholder, GuestStakeholder, BusinessEntity, StakeholderInfo, EmailVerifyToken
+from stakeholder.serializers import StakeholderRegStatusSerializer, BusinessEntitySerializer, </p>
+<blockquote>
+<div>StakeholderFullSerializer, StakeholderUpdateSerializer, StakeholderChangePasswordSerializer, StakeholderDetailSerializer, StakeholderInfoSerializer</div></blockquote>
+<p>from stakeholder.tasks import send_template
+from users import serializers as user_serializers
+from users.models import CamelportUser, ChangePasswordToken
+from users.serializers import EmailVerificationSerilaizer
+from utils.mail import SendGridHelper</p>
+<dl class="docutils">
+<dt>class RegisterView(generics.CreateAPIView):</dt>
+<dd><p class="first">“”“</p>
+<p>This view is to register a new stakeholder.</p>
+<p>“”“</p>
+<p>notification_functions = [‘sendgrid_notif’]
+notification_on = [‘create’]
+serializer_class = stakeholder_serializers.StakeholderRegisterSerializer</p>
+<dl class="last docutils">
+<dt>def create(self, request, <a href="#id1"><span class="problematic" id="id2">*</span></a>args, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs):</dt>
+<dd><p class="first">“”“</p>
+<p>Method to create data.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param request:</th><td class="field-body">requests the data.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">param args:</th><td class="field-body">variable length argument list.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">param kwargs:</th><td class="field-body">arbitrary keyword arguments.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">return:</th><td class="field-body">returns the response data.</td>
+</tr>
+</tbody>
+</table>
+<p>“””
+serializer = self.get_serializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+self.perform_create(serializer)
+headers = self.get_success_headers(serializer.data)</p>
+<p>Token.objects.create(user=serializer.instance.user)
+StakeholderInfo.objects.create(stakeholder=serializer.instance)</p>
+<p># session = Session.objects.create(stakeholder=serializer.instance)</p>
+<p>email_token = EmailVerifyToken.objects.create(stakeholder=serializer.instance)</p>
+<dl class="docutils">
+<dt>self.send_verification_email(</dt>
+<dd><p class="first">stk_instance=serializer.instance,
+email_verification_url=settings.EMAIL_VERIFY_URL.format(</p>
+<blockquote>
+<div>token=email_token.token</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>)</p>
+<p>response_data = serializer.data</p>
+<p>response_data[‘dynamic_table’] = serializer.instance.dynamic_table.table_name
+response_data[‘reg_status’] = serializer.instance.reg_status
+response_data[‘is_enabled’] = serializer.instance.is_enabled
+response_data[‘razor_pay’] = serializer.instance.razor_pay
+response_data[‘razor_account_number’] = serializer.instance.razor_account_number
+response_data[‘razor_ifsc_code’] = serializer.instance.razor_ifsc_code
+response_data[‘quickbooks_customer’] = serializer.instance.quickbooks_customer
+response_data[‘helpscout_id’] = serializer.instance.helpscout_id</p>
+<dl class="last docutils">
+<dt>return Response(response_data, status=status.HTTP_201_CREATED,</dt>
+<dd>headers=headers)</dd>
+</dl>
+</dd>
+<dt>def sendgrid_notif(self, instance):</dt>
+<dd><p class="first">“”“</p>
+<p>Method to send grid notification.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param instance:</th><td class="field-body">holds the instance data of the user</td>
+</tr>
+<tr class="field-even field"><th class="field-name">return:</th><td class="field-body">returns the response</td>
+</tr>
+</tbody>
+</table>
+<p>“””
+response = SendGridHelper().send_template(</p>
+<blockquote>
+<div><p>template_id=’c1a0dc3f-c619-487f-8759-c843ea8b45a7’,
+email_to=instance.user.email,
+subject=”Welcome to Camelport”,
+substitutions={</p>
+<blockquote>
+<div>‘name’: instance.executive_first_name</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p class="last">)
+return response</p>
+</dd>
+<dt>def send_verification_email(self, stk_instance, email_verification_url):</dt>
+<dd><p class="first">“”“</p>
+<p>Method to send verification email.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">param stk_instance:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body">holds instance of stakeholder</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">param email_verification_url:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body">url to verify email</td>
+</tr>
+</tbody>
+</table>
+<p>“””
+send_template(</p>
+<blockquote>
+<div><p>template_id=’c1a0dc3f-c619-487f-8759-c843ea8b45a7’,
+email_to=stk_instance.user.email,
+subject=”Welcome to Camelport”,
+substitutions={</p>
+<blockquote>
+<div>‘name’: stk_instance.executive_first_name,
+‘email_verification_url’: email_verification_url</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class Check_Is_EnabledView(APIView):</dt>
+<dd><p class="first">“”“</p>
+<p>This class checks whether the view is enabled.</p>
+<p>“””
+permission_classes = [IsAuthenticated, ]</p>
+<dl class="last docutils">
+<dt>def get(self, request, <a href="#id5"><span class="problematic" id="id6">*</span></a>args, <a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs):</dt>
+<dd><p class="first">“”“</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param request:</th><td class="field-body">requests to get the data</td>
+</tr>
+<tr class="field-even field"><th class="field-name">param args:</th><td class="field-body">variable length argument list.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">param kwargs:</th><td class="field-body">arbitrary keyword arguments.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">return:</th><td class="field-body">returns response</td>
+</tr>
+</tbody>
+</table>
+<p class="last">“””
+return Response({‘pricing_plan’: request.user.stakeholder.pricing_plan})</p>
+</dd>
+</dl>
+</dd>
+<dt>class LoginView(generics.CreateAPIView):</dt>
+<dd><p class="first">serializer_class = user_serializers.CamelportUserLoginSerializer</p>
+<dl class="last docutils">
+<dt>def create(self, request, <a href="#id9"><span class="problematic" id="id10">*</span></a>args, <a href="#id11"><span class="problematic" id="id12">**</span></a>kwargs):</dt>
+<dd><p class="first">serializer = self.get_serializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+self.perform_create(serializer)
+headers = self.get_success_headers(serializer.data)</p>
+<dl class="docutils">
+<dt>if serializer.instance.stakeholder.dynamic_table.table_name in [‘Guest1’, ‘Guest2’, ‘Guest3’, ‘Guest4’]:</dt>
+<dd><dl class="first last docutils">
+<dt>token = Token.objects.get(</dt>
+<dd>user=serializer.instance.stakeholder.guest_child_stakeholder.parent_stakeholder.user)</dd>
+</dl>
+</dd>
+<dt>else:</dt>
+<dd>token, created = Token.objects.get_or_create(user=serializer.instance)</dd>
+</dl>
+<p>stakeholder_serializer = StakeholderFullSerializer(instance=serializer.instance.stakeholder)
+# session = Session.objects.create(stakeholder=serializer.instance.stakeholder,
+#                                  expires_on=timezone.now() + timezone.timedelta(days=1))
+response_data = stakeholder_serializer.data</p>
+<p>response_data[‘token’] = {‘key’: token.key}</p>
+<p>response_data[‘dynamic_table’] = serializer.instance.stakeholder.dynamic_table.table_name
+response_data[‘reg_status’] = serializer.instance.stakeholder.reg_status
+response_data[‘is_enabled’] = serializer.instance.stakeholder.is_enabled
+response_data[‘razor_pay’] = serializer.instance.stakeholder.razor_pay
+response_data[‘razor_account_number’] = serializer.instance.stakeholder.razor_account_number
+response_data[‘razor_ifsc_code’] = serializer.instance.stakeholder.razor_ifsc_code
+response_data[‘quickbooks_customer’] = serializer.instance.stakeholder.quickbooks_customer
+response_data[‘helpscout_id’] = serializer.instance.stakeholder.helpscout_id
+# response_data[‘session_id’] = session.id</p>
+<p>##
+# parent_stakeholder = serializer.instance.stakeholder.guest_child_stakeholder
+try:</p>
+<blockquote>
+<div><p>guest_stakeholder = GuestStakeholder.objects.get(child_stakeholder__id=response_data[‘id’])</p>
+<p>p_stakeholder = guest_stakeholder.parent_stakeholder
+if p_stakeholder:</p>
+<blockquote>
+<div>response_data[‘parent_stakeholder_type’] = p_stakeholder.dynamic_table.table_name
+response_data[‘guest_stakeholder_type’] = guest_stakeholder.name
+response_data[‘reg_status’] = p_stakeholder.reg_status</div></blockquote>
+</div></blockquote>
+<dl class="last docutils">
+<dt>except:</dt>
+<dd>pass</dd>
+<dt>return Response(</dt>
+<dd>response_data,
+status=status.HTTP_200_OK,
+headers=headers)</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+<p># class LoginView(generics.CreateAPIView):
+#    serializer_class = user_serializers.CamelportUserLoginSerializer
+#
+#    def create(self, request, <a href="#id13"><span class="problematic" id="id14">*</span></a>args, <a href="#id15"><span class="problematic" id="id16">**</span></a>kwargs):
+#        serializer = self.get_serializer(data=request.data)
+#        serializer.is_valid(raise_exception=True)
+#        self.perform_create(serializer)
+#        headers = self.get_success_headers(serializer.data)
+#
+#        firebase_token, created = firebase_token.objects.get_or_create(user=serializer.instance)
+#
+#        return Response({‘key’: firebase_token.key,
+#                         ‘email’: serializer.instance.email}, status=status.HTTP_200_OK, headers=headers)</p>
+<dl class="docutils">
+<dt>class StakeholderZendeskView(generics.RetrieveAPIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_object(self):</dt>
+<dd>return get_object_or_404(Stakeholder, zendesk_id=self.kwargs[‘zendesk_id’])</dd>
+<dt>def get_serializer(self, <a href="#id17"><span class="problematic" id="id18">*</span></a>args, <a href="#id19"><span class="problematic" id="id20">**</span></a>kwargs):</dt>
+<dd>obj = self.get_object()</dd>
+</dl>
+</dd>
+<dt>class StakeholderDynamicValueRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>qs = Stakeholder.objects.all()
+return qs</dd>
+<dt>def get_serializer(self, <a href="#id21"><span class="problematic" id="id22">*</span></a>args, <a href="#id23"><span class="problematic" id="id24">**</span></a>kwargs):</dt>
+<dd><p class="first">dynamic_table = self.get_object().dynamic_table</p>
+<dl class="docutils">
+<dt>ser = serializer_factory(</dt>
+<dd>mdl=Stakeholder,
+fields=Stakeholder.get_fields_list(),
+dyn_table=dynamic_table,</dd>
+</dl>
+<p class="last">)
+return ser(<a href="#id25"><span class="problematic" id="id26">*</span></a>args, <a href="#id27"><span class="problematic" id="id28">**</span></a>kwargs)</p>
+</dd>
+</dl>
+</dd>
+<dt>class GuestStakeholderView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">serializer_class = stakeholder_serializers.GuestStakeholderSerializer</p>
+<dl class="last docutils">
+<dt>def get_serializer_context(self):</dt>
+<dd>context = super(GuestStakeholderView, self).get_serializer_context()
+context[‘logged_in_stakeholder’] = self.request.user.stakeholder
+return context</dd>
+<dt>def get_queryset(self):</dt>
+<dd>return GuestStakeholder.objects.filter(guest_child_stakeholder__parent_stakeholder__user=self.request.user)</dd>
+</dl>
+</dd>
+<dt>class GuestStakeholderRUDView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">serializer_class = StakeholderFullSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Stakeholder.objects.filter(guest_child_stakeholder__parent_stakeholder__user=self.request.user)</dd>
+</dl>
+</dd>
+</dl>
+<p>class StakeholderTypeView(generics.ListAPIView):</p>
+<blockquote>
+<div><p>serializer_class = DynamicTableSerializer</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return DynamicTable.objects.filter(content_type=ContentType.objects.get(model=’stakeholder’))</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>class StakeholderRegStatusUpdateView(generics.UpdateAPIView):</dt>
+<dd><p class="first">serializer_class = StakeholderRegStatusSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Stakeholder.objects.all()</dd>
+<dt>def get_object(self):</dt>
+<dd>return self.request.user.stakeholder</dd>
+</dl>
+</dd>
+<dt>class StakeholderUpdateView(generics.UpdateAPIView):</dt>
+<dd><p class="first">serializer_class = StakeholderFullSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Stakeholder.objects.all()</dd>
+<dt>def get_object(self):</dt>
+<dd>return self.request.user.stakeholder</dd>
+<dt>def get_serializer(self, <a href="#id29"><span class="problematic" id="id30">*</span></a>args, <a href="#id31"><span class="problematic" id="id32">**</span></a>kwargs):</dt>
+<dd><p class="first">data = self.request.data
+if ‘dynamic_table’ in data:</p>
+<blockquote>
+<div>data.pop(‘dynamic_table’)</div></blockquote>
+<dl class="docutils">
+<dt>if ‘user’ in data:</dt>
+<dd>data.pop(‘user’)</dd>
+</dl>
+<p>kwargs[‘data’] = data</p>
+<p class="last">return StakeholderUpdateSerializer(<a href="#id33"><span class="problematic" id="id34">*</span></a>args, <a href="#id35"><span class="problematic" id="id36">**</span></a>kwargs)</p>
+</dd>
+</dl>
+</dd>
+<dt>class StakeholderRetrieveView(generics.RetrieveAPIView):</dt>
+<dd><p class="first">serializer_class = StakeholderFullSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Stakeholder.objects.all()</dd>
+<dt>def get_object(self):</dt>
+<dd>return self.request.user.stakeholder</dd>
+</dl>
+</dd>
+<dt>class BusinessEntityAutocompleteView(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = BusinessEntitySerializer</p>
+<p>def get_queryset(self):</p>
+<blockquote>
+<div><p>search_text = self.request.query_params.get(‘search’)</p>
+<p>query = self.get_query(search_text.split(” “), ‘AND’)</p>
+<p>query_set = BusinessEntity.objects.raw(query)</p>
+<p>result = list(query_set)</p>
+<dl class="docutils">
+<dt>if len(result) == 0:</dt>
+<dd><p class="first">query = self.get_query(search_text.split(” “), ‘OR’)</p>
+<p>query_set = BusinessEntity.objects.raw(query)</p>
+<p class="last">result = list(query_set)</p>
+</dd>
+</dl>
+<p>return result</p>
+</div></blockquote>
+<p>def get_query(self, texts, appender):</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>lexeme_search = “”“to_tsquery(‘simple’, (</dt>
+<dd><blockquote class="first">
+<div>SELECT string_agg(word, ‘|’)
+FROM company_unique_lexeme
+WHERE similarity(word, ‘{text}’)&gt; 0.72)</div></blockquote>
+<p class="last">)”“”</p>
+</dd>
+</dl>
+<p>search_condition_boiler_plate = “”“{amp} document &#64;&#64; {lexeme_search}”“”</p>
+<dl class="docutils">
+<dt>order_by_boilder_plate = “”“{comma} ts_rank(document, to_tsquery(‘simple’, (</dt>
+<dd>SELECT string_agg(word, ‘|’)
+FROM company_unique_lexeme
+WHERE similarity(word, ‘{text}’)&gt; 0.72))
+)”“”</dd>
+</dl>
+<p>order_by = search_condition = ‘’</p>
+<dl class="docutils">
+<dt>for index, text in enumerate(texts):</dt>
+<dd><dl class="first docutils">
+<dt>if index == 0:</dt>
+<dd>amp = ‘’
+comma = ‘’</dd>
+<dt>else:</dt>
+<dd>amp = appender
+comma = ‘, ‘</dd>
+</dl>
+<p>text = text.replace(“’”, “’‘”)</p>
+<dl class="docutils">
+<dt>search_condition = search_condition + search_condition_boiler_plate.format(</dt>
+<dd>lexeme_search=lexeme_search.format(text=text),
+amp=amp</dd>
+</dl>
+<p>)</p>
+<p class="last">order_by = order_by + order_by_boilder_plate.format(text=text, comma=comma)</p>
+</dd>
+<dt>return “”“SELECT</dt>
+<dd><blockquote class="first">
+<div>id, company_name</div></blockquote>
+<p class="last">FROM company_name_index
+WHERE {condition}
+ORDER BY {order_by}
+DESC LIMIT 10;”“”.format(condition=search_condition, order_by=order_by)</p>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+<dt>class SendOTPView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id37"><span class="problematic" id="id38">*</span></a>args, <a href="#id39"><span class="problematic" id="id40">**</span></a>kwargs):</dt>
+<dd><p class="first">otp = randint(1000, 9999)
+mydict = {</p>
+<blockquote>
+<div>‘authkey’: settings.MOBILEAUTHKEY,
+‘mobile’: request.data[‘mobile’],
+‘message’: “Your OTP for registration on Camelport X is {}”.format(otp),
+‘sender’: ‘CMPORT’,
+‘country’: ‘0’,
+‘otp’: otp</div></blockquote>
+<p>}</p>
+<p>headers = {‘Content-Type’: ‘application/json’}
+# req = request
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="http://api.msg91.com/api/sendotp.php">http://api.msg91.com/api/sendotp.php</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+# headers=headers,
+data=mydict</div></blockquote>
+<p>)
+rr = json.loads(r.text)
+return Response(rr, r.status_code)</p>
+<p class="last"># return Response(customer_created)</p>
+</dd>
+</dl>
+</dd>
+<dt>class SendOTPEwayBillView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id41"><span class="problematic" id="id42">*</span></a>args, <a href="#id43"><span class="problematic" id="id44">**</span></a>kwargs):</dt>
+<dd><p class="first">otp = randint(1000, 9999)
+mydict = {</p>
+<blockquote>
+<div>‘authkey’: settings.MOBILEAUTHKEY,
+‘mobile’: request.data[‘mobile’],
+‘message’: “Your OTP for registration on Go Eway Bill is {}”.format(otp),
+‘sender’: ‘GOEWYB’,
+‘country’: ‘0’,
+‘otp’: otp</div></blockquote>
+<p>}</p>
+<p>headers = {‘Content-Type’: ‘application/json’}
+# req = request
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="http://api.msg91.com/api/sendotp.php">http://api.msg91.com/api/sendotp.php</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+# headers=headers,
+data=mydict</div></blockquote>
+<p>)
+rr = json.loads(r.text)
+return Response(rr, r.status_code)</p>
+<p class="last"># return Response(customer_created)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p># class SendOTPView(APIView):
+#     def post(self, request, <a href="#id45"><span class="problematic" id="id46">*</span></a>args, <a href="#id47"><span class="problematic" id="id48">**</span></a>kwargs):
+#         otp = randint(1000, 9999)
+#         mydict = {
+#             ‘authkey’: settings.MOBILEAUTHKEY,
+#             ‘mobile’: request.data[‘mobile’],
+#             ‘message’: “Your OTP for registration on Camelport X is {}”.format(otp),
+#             ‘sender’: ‘CMPORT’,
+#             ‘country’: ‘0’,
+#             ‘otp’: otp
+#         }
+#
+#         headers = {‘Content-Type’: ‘application/json’}
+#         # req = request
+#         r = requests.post(
+#             url=’<a class="reference external" href="http://api.msg91.com/api/sendotp.php">http://api.msg91.com/api/sendotp.php</a>’,
+#             # auth=(‘authkey’, settings.MOBILEAUTHKEY),
+#             # headers=headers,
+#             data=mydict
+#         )
+#         rr = r
+#         return r.content</p>
+<dl class="docutils">
+<dt>class VerifyOTPView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id49"><span class="problematic" id="id50">*</span></a>args, <a href="#id51"><span class="problematic" id="id52">**</span></a>kwargs):</dt>
+<dd><p class="first"># otp = randint(1000, 9999)
+mydict = {</p>
+<blockquote>
+<div>‘authkey’: settings.MOBILEAUTHKEY,
+‘mobile’: request.data[‘mobile’],
+‘country’: ‘0’,
+‘otp’: request.data[‘otp’]</div></blockquote>
+<p>}</p>
+<p>headers = {‘Content-Type’: ‘application/json’}
+# req = request
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="http://api.msg91.com/api/verifyRequestOTP.php">http://api.msg91.com/api/verifyRequestOTP.php</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+# headers=headers,
+data=mydict</div></blockquote>
+<p class="last">)
+rr = json.loads(r.text)
+return Response(rr, r.status_code)</p>
+</dd>
+</dl>
+</dd>
+<dt>class RetryOTPView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id53"><span class="problematic" id="id54">*</span></a>args, <a href="#id55"><span class="problematic" id="id56">**</span></a>kwargs):</dt>
+<dd><p class="first"># otp = randint(1000, 9999)
+mydict = {</p>
+<blockquote>
+<div>‘authkey’: settings.MOBILEAUTHKEY,
+‘mobile’: request.data[‘mobile’],
+‘country’: ‘0’,
+‘retrytype’: ‘text’,
+# ‘otp’: request.data[‘otp’]</div></blockquote>
+<p>}</p>
+<p>headers = {‘Content-Type’: ‘application/json’}
+# req = request
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="http://api.msg91.com/api/retryotp.php">http://api.msg91.com/api/retryotp.php</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+# headers=headers,
+data=mydict</div></blockquote>
+<p class="last">)
+rr = json.loads(r.text)
+return Response(rr, r.status_code)</p>
+</dd>
+</dl>
+</dd>
+<dt>class VerifyEmailView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id57"><span class="problematic" id="id58">*</span></a>args, <a href="#id59"><span class="problematic" id="id60">**</span></a>kwargs):</dt>
+<dd><dl class="first docutils">
+<dt>params = {</dt>
+<dd>‘access_key’: ‘10caac591e70973ae6f7c9b94108f5f7’,
+‘email’: request.data[‘email’]</dd>
+</dl>
+<p>}
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="http://apilayer.net/api/check">http://apilayer.net/api/check</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+# headers=headers,
+params=params,
+# data=mydict</div></blockquote>
+<p class="last">)
+return Response(json.loads(r.text), r.status_code)</p>
+</dd>
+</dl>
+</dd>
+<dt>class EWayBillGSTView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get(self, request, <a href="#id61"><span class="problematic" id="id62">*</span></a>args, <a href="#id63"><span class="problematic" id="id64">**</span></a>kwargs):</dt>
+<dd><dl class="first docutils">
+<dt>headers = {</dt>
+<dd>“Content-Type”: “application/json”</dd>
+</dl>
+<p>}
+mydict = {</p>
+<blockquote>
+<div>‘gstin’: kwargs[“gst”]</div></blockquote>
+<p>}</p>
+<dl class="docutils">
+<dt>response = requests.post(</dt>
+<dd>url=’<a class="reference external" href="https://ewaybill.nic.in/BillGeneration/BillGeneration.aspx/GetGSTNDetails">https://ewaybill.nic.in/BillGeneration/BillGeneration.aspx/GetGSTNDetails</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+headers=headers,
+# params=params,
+data=json.dumps(mydict)</dd>
+</dl>
+<p>)
+if 199 &lt; response.status_code &lt; 300:</p>
+<blockquote>
+<div><p>response_dict = json.loads(response.text)
+if response_dict[‘d’]:</p>
+<blockquote>
+<div>return Response(response_dict[‘d’])</div></blockquote>
+<dl class="docutils">
+<dt>else:</dt>
+<dd>return Response({}, status.HTTP_404_NOT_FOUND)</dd>
+</dl>
+</div></blockquote>
+<dl class="last docutils">
+<dt>else:</dt>
+<dd>return Response({}, status.HTTP_404_NOT_FOUND)</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>class inttra_auth_check(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id65"><span class="problematic" id="id66">*</span></a>args, <a href="#id67"><span class="problematic" id="id68">**</span></a>kwargs):</dt>
+<dd><p class="first"># params = {“emailId”:”“,”username”:”ALBERT_825135”,”sessionKey”:”“,”oldPassword”:”“,”languageId”:”1”,”password”:”<a class="reference external" href="mailto:sjku&#37;&#52;&#48;123">sjku<span>&#64;</span>123</a>”,”requestUrl”:”“}
+params = {</p>
+<blockquote>
+<div>“emailId”: “”,
+“username”: request.data[‘username’],
+“sessionKey”: “”,
+“oldPassword”: “”,
+“languageId”: “1”,
+“password”: request.data[‘password’],
+“requestUrl”: “”</div></blockquote>
+<p>}
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="https://www.ship.inttra.com/portal/authenticate">https://www.ship.inttra.com/portal/authenticate</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+# headers=headers,
+params=params,</div></blockquote>
+<p class="last">)
+return Response(json.loads(r.text), r.status_code)</p>
+</dd>
+</dl>
+</dd>
+<dt>class itekseal_auth_check(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id69"><span class="problematic" id="id70">*</span></a>args, <a href="#id71"><span class="problematic" id="id72">**</span></a>kwargs):</dt>
+<dd><p class="first"># params = {“emailId”:”“,”username”:”ALBERT_825135”,”sessionKey”:”“,”oldPassword”:”“,”languageId”:”1”,”password”:”<a class="reference external" href="mailto:sjku&#37;&#52;&#48;123">sjku<span>&#64;</span>123</a>”,”requestUrl”:”“}
+params = {</p>
+<blockquote>
+<div>“sTag”: “TAG_1520082718669”,
+“sExtraInfo”: “Something Extra”,
+“sAppId”: “3792c1ca-7a6d-4cf2-bbf8-4c838715f2dc”,
+“sUserName”: “vaibhav”,
+# “sUserName”: request.data[‘username’],
+“sLoginId”: “vaibhav”,
+“sPasswordHash”: “401b09eab3c013d4ca54922bb802bec8fd5318192b0a75f201d8b3727429080fb337591abd3e44453b954555b7a0812e1081c39b740293f765eae731f5a65ed1”,
+# “sPasswordHash”: request.data[‘password’],
+“sClientInfo”: “”,
+“sIP”: “”</div></blockquote>
+<p>}
+params = request.data
+headers = {</p>
+<blockquote>
+<div>“Content-Type”: “application/x-www-form-urlencoded”</div></blockquote>
+<p>}
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="https://www.itekseal.com/rseal/Auth/Login">https://www.itekseal.com/rseal/Auth/Login</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+headers=headers,
+params=params,</div></blockquote>
+<p class="last">)
+return Response(json.loads(r.text), r.status_code)</p>
+</dd>
+</dl>
+</dd>
+<dt>class odex_auth_check(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id73"><span class="problematic" id="id74">*</span></a>args, <a href="#id75"><span class="problematic" id="id76">**</span></a>kwargs):</dt>
+<dd><p class="first"># params = {“emailId”:”“,”username”:”ALBERT_825135”,”sessionKey”:”“,”oldPassword”:”“,”languageId”:”1”,”password”:”<a class="reference external" href="mailto:sjku&#37;&#52;&#48;123">sjku<span>&#64;</span>123</a>”,”requestUrl”:”“}
+params = {</p>
+<blockquote>
+<div>“compLocId”: “”,
+“loginId”: “vaibhav”,
+“password”: “ASDF”,
+“email”: “”</div></blockquote>
+<p>}
+headers = {</p>
+<blockquote>
+<div>“Content-Type”: “application/x-www-form-urlencoded”</div></blockquote>
+<p>}
+r = requests.post(</p>
+<blockquote>
+<div>url=’<a class="reference external" href="https://odex.co/authenticateLogin.do">https://odex.co/authenticateLogin.do</a>’,
+# auth=(‘authkey’, settings.MOBILEAUTHKEY),
+headers=headers,
+params=params,</div></blockquote>
+<p class="last">)
+return Response(json.loads(r.text), r.status_code)</p>
+</dd>
+</dl>
+</dd>
+<dt>class GuestStakeholderListView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = None
+serializer_class = StakeholderFullSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Stakeholder.objects.filter(guest_child_stakeholder__parent_stakeholder__user=self.request.user)</dd>
+</dl>
+</dd>
+<dt>class ChangePasswordRequestView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id77"><span class="problematic" id="id78">*</span></a>args, <a href="#id79"><span class="problematic" id="id80">**</span></a>kwargs):</dt>
+<dd><p class="first">#  validate
+if ‘email’ in request.data:</p>
+<blockquote>
+<div><p>user = get_object_or_404(CamelportUser, email=request.data.get(‘email’))
+pass_token, created = ChangePasswordToken.objects.get_or_create(</p>
+<blockquote>
+<div>user=user</div></blockquote>
+<p>)
+params = {</p>
+<blockquote>
+<div>‘url’: settings.CHANGE_PASSWORD_URL.format(token=pass_token.token)</div></blockquote>
+<p>}</p>
+<p># send_template(
+send_template(</p>
+<blockquote>
+<div>template_id=‘0991778d-d8a1-4e5f-ba85-308a81632775’,
+substitutions=params,
+email_to=request.data.get(‘email’),
+subject=’Password Reset’</div></blockquote>
+<p>)</p>
+<p>return Response({‘status’: ‘success’})</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>else:</dt>
+<dd><dl class="first docutils">
+<dt>return Response({</dt>
+<dd>‘status’: ‘failure’,
+‘message’: ‘email is a mandatory field’</dd>
+</dl>
+<p class="last">})</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>class ChangeStakeholderPasswordView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id81"><span class="problematic" id="id82">*</span></a>args, <a href="#id83"><span class="problematic" id="id84">**</span></a>kwargs):</dt>
+<dd><p class="first">serializer = StakeholderChangePasswordSerializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+password = serializer.validated_data[‘password1’]</p>
+<p>token = kwargs[‘token’]</p>
+<p>cp_token = get_object_or_404(ChangePasswordToken, token=token)</p>
+<p>cp_token.change_password(password)</p>
+<p class="last">return Response({‘status’: ‘success’})</p>
+</dd>
+<dt>def get(self, request, <a href="#id85"><span class="problematic" id="id86">*</span></a>args, <a href="#id87"><span class="problematic" id="id88">**</span></a>kwargs):</dt>
+<dd><p class="first">token = kwargs[‘token’]</p>
+<p>cp_token = get_object_or_404(ChangePasswordToken, token=token)</p>
+<p>serializer = StakeholderDetailSerializer(instance=cp_token.user.stakeholder)</p>
+<p class="last">return Response(serializer.data)</p>
+</dd>
+</dl>
+</dd>
+<dt>class ChangeUserPasswordView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def post(self, request, <a href="#id89"><span class="problematic" id="id90">*</span></a>args, <a href="#id91"><span class="problematic" id="id92">**</span></a>kwargs):</dt>
+<dd>serializer = StakeholderChangePasswordSerializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+password = serializer.validated_data[‘password1’]
+user = request.user
+user.change_password(password)
+return Response({‘status’: ‘success’})</dd>
+</dl>
+</dd>
+<dt>class StakeholderInfoRetrieveAPIView(generics.RetrieveAPIView):</dt>
+<dd><p class="first">serializer_class = StakeholderInfoSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return StakeholderInfo.objects.all()</dd>
+<dt>def get_object(self):</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd>return self.request.user.stakeholder.stakeholderinfo</dd>
+<dt>except Exception as exc:</dt>
+<dd>raise Http404</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>class EmailVerifyView(generics.CreateAPIView):</dt>
+<dd><p class="first">serializer_class = EmailVerificationSerilaizer</p>
+<dl class="last docutils">
+<dt>def create(self, request, <a href="#id93"><span class="problematic" id="id94">*</span></a>args, <a href="#id95"><span class="problematic" id="id96">**</span></a>kwargs):</dt>
+<dd>serializer = self.get_serializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+self.perform_create(serializer)
+return Response({‘status’: ‘success’}, status=status.HTTP_200_OK)</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="stakeholder.html"
+                        title="previous chapter">Stakeholder</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="model.html"
+                        title="next chapter">stakeholder.models</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/view.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="model.html" title="stakeholder.models"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="stakeholder.html" title="Stakeholder"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

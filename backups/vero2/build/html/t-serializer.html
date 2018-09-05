@@ -1,0 +1,1218 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>task.serializers &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="task.models" href="t-model.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="t-model.html" title="task.models"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="task-serializers">
+<h1>task.serializers<a class="headerlink" href="#task-serializers" title="Permalink to this headline">¶</a></h1>
+<p>import json
+from collections import OrderedDict
+from copy import deepcopy</p>
+<p>from django.conf import settings
+from django.db.models import Q
+from django.utils import timezone
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser
+from rest_framework.utils.serializer_helpers import BindingDict</p>
+<p>from booking.models import CPBooking, Booking
+from booking.serializer import CPBookingForActiveTaskSerializer
+from rates.serializer import BidPagePenaltySerializer
+from shipment.models import Shipment, ShipmentBooking
+from stakeholder.serializers import StakeholderShortSerializer
+from task.models import Task, AbstractTask, TaskFiles, FileUploads, FormElement, Form, TaskBaseModel, </p>
+<blockquote>
+<div>FormElementValue, TaskVariable, FileFormElementValue  # TaskData</div></blockquote>
+<p># class TaskDataLCSerializer(serializers.Serializer):
+#     data = serializers.CharField(max_length=4096)
+#
+#     class Meta:
+#         fields = (
+#             ‘data’
+#         )
+#
+#     def create(self, validated_data):
+#         task = self.context[‘task’]
+#         task_data = TaskData.objects.create(task=task, <a href="#id1"><span class="problematic" id="id2">**</span></a>validated_data)
+#         task.mark_as_completed()
+#         return task_data</p>
+<hr class="docutils" />
+<p># &#64;TODO: change file uploads to the new scheme of bulk upload of all files in a booking.</p>
+<dl class="docutils">
+<dt>class AbstractTaskWithPenaltiesSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">penalties = BidPagePenaltySerializer(source=’get_penalty_set’, many=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractTask
+fields = (</p>
+<blockquote>
+<div>‘task_for’,
+‘expiry’,
+‘escalate_at’,
+‘mode_type’,
+‘hub_type’,
+‘is_incoming’,
+‘penalties’,
+‘estimated_completion_at’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class FileUploadSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = FileUploads
+fields = (</p>
+<blockquote>
+<div>‘file_number’,
+‘file’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskFileUploadSerializer(serializers.Serializer):</dt>
+<dd><p class="first">files = FileUploadSerializer(many=True)</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><dl class="first docutils">
+<dt>fields = (</dt>
+<dd>‘files’,</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>parser_classes = (MultiPartParser,)</p>
+<dl class="last docutils">
+<dt>def update(self, instance, validated_data):</dt>
+<dd>files = validated_data[‘files’]</dd>
+<dt>def create(self, validated_data):</dt>
+<dd><p class="first">task = self.context[‘task’]
+task_files = TaskFiles.objects.create(task=task)</p>
+<dl class="docutils">
+<dt>for <a href="#id23"><span class="problematic" id="id24">file_</span></a> in validated_data[‘files’]:</dt>
+<dd>file_upload = FileUploads.objects.create(<a href="#id3"><span class="problematic" id="id4">**</span></a><a href="#id25"><span class="problematic" id="id26">file_</span></a>)
+task_files.files.add(file_upload)</dd>
+</dl>
+<p class="last">task.mark_as_completed()
+return task_files</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<hr class="docutils" />
+<p># class TaskFileDownloadSerializer(serializers.ModelSerializer):
+#     def create(self, validated_data):
+#         task = self.context[‘task’]
+#         task_data = TaskData.objects.create(task=task, <a href="#id5"><span class="problematic" id="id6">**</span></a>validated_data)
+#         task.mark_as_completed()
+#         return task_data
+#
+#
+# class AcknowledgementSerializer(serializers.ModelSerializer):
+#     def create(self, validated_data):
+#         task = self.context[‘task’]
+#         task_data = TaskData.objects.create(task=task, <a href="#id7"><span class="problematic" id="id8">**</span></a>validated_data)
+#         task.mark_as_completed()
+#         return task_data</p>
+<dl class="docutils">
+<dt>class TaskSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">task_for = StakeholderShortSerializer()
+secondary_stakeholders = StakeholderShortSerializer(many=True)
+notify_stakeholders = StakeholderShortSerializer(many=True)
+booking = CPBookingForActiveTaskSerializer()
+completed_percentage = serializers.IntegerField(source=’get_task_is_filled_percent’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Task
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘task_name’,
+‘task_description’,
+‘dependency_tasks’,
+‘task_for’,
+‘triggered_at’,
+‘expiry’,
+‘escalation’,
+‘notify_stakeholders’,
+‘secondary_stakeholders’,
+‘task_type’,
+‘completed_percentage’,
+‘task_category’,
+‘is_active’,
+‘completed_at’,
+‘booking’,
+‘event’,
+‘trigger_tasks_on_completion’,
+‘abstract_task’,
+‘estimated_completion’,
+‘partially_completed_at’,
+‘expired_at’,</div></blockquote>
+<p>)</p>
+<p class="last"># &#64;TODO: add validation for task type (stakeholder &amp; hubs allowed)</p>
+</dd>
+<dt>def validate(self, data):</dt>
+<dd><p class="first">triggered_at = data[‘trigger_tasks_on_completion’]
+dependency_tasks = data[‘dependency_tasks’]</p>
+<p>intersection = set(triggered_at).intersection(set(dependency_tasks))
+if len(intersection) &gt; 0:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>raise serializers.ValidationError(</dt>
+<dd>{‘trigger_tasks_on_completion’: ‘common task found in triggered_at and dependency_tasks’})</dd>
+</dl>
+</div></blockquote>
+<p class="last">return data</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskGantChartSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">task_for = StakeholderShortSerializer()
+secondary_stakeholders = StakeholderShortSerializer(many=True)
+notify_stakeholders = StakeholderShortSerializer(many=True)
+booking = CPBookingForActiveTaskSerializer()
+completed_percentage = serializers.IntegerField(source=’get_task_is_filled_percent’)
+can_edit = serializers.SerializerMethodField(read_only=True)
+can_view = serializers.SerializerMethodField(read_only=True)</p>
+<p># completed_percentage = serializers.SerializerMethodField(‘get_task_is_filled_percent’)
+class Meta:</p>
+<blockquote>
+<div><p>model = Task
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘task_name’,
+‘task_description’,
+‘dependency_tasks’,
+‘task_for’,
+‘triggered_at’,
+‘expiry’,
+‘escalation’,
+‘notify_stakeholders’,
+‘secondary_stakeholders’,
+‘task_type’,
+‘is_active’,
+‘completed_at’,
+‘booking’,
+‘event’,
+‘trigger_tasks_on_completion’,
+‘abstract_task’,
+‘estimated_completion’,
+‘partially_completed_at’,
+‘completed_percentage’,
+‘expired_at’,
+‘can_edit’,
+‘can_view’</div></blockquote>
+<p>)</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def get_can_view(self, instance):</dt>
+<dd><p class="first">stakeholder = self.context[‘request’].user.stakeholder</p>
+<dl class="last docutils">
+<dt>return instance.task_for == stakeholder </dt>
+<dd>or instance.secondary_stakeholders.filter(pk=stakeholder.id).exists() or instance.notify_stakeholders.filter(pk=stakeholder.id).exists()</dd>
+</dl>
+</dd>
+<dt>def get_can_edit(self, instance):</dt>
+<dd><p class="first">stakeholder = self.context[‘request’].user.stakeholder</p>
+<dl class="last docutils">
+<dt>return instance.task_for == stakeholder </dt>
+<dd>or instance.secondary_stakeholders.filter(pk=stakeholder.id).exists()</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>class FormElementsSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">kwargs = serializers.DictField(source=’get_kwargs_dict’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = FormElement
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘type’,
+‘css_class’,
+‘label’,
+‘placeholder’,
+‘name’,
+‘kwargs’,
+‘default’,
+‘order’,
+‘assign_to_var’,
+‘is_autofill’,
+# ‘is_editable’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def to_representation(self, instance):</dt>
+<dd>result = super(FormElementsSerializer, self).to_representation(instance)
+result[‘type’] = instance.get_type_display()
+# if instance.kwargs:
+#     result[‘kwargs’] = json.loads(instance.kwargs)
+return result</dd>
+<dt>def create(self, validated_data):</dt>
+<dd>validated_data[‘kwargs’] = json.dumps(validated_data.pop(‘get_kwargs_dict’))
+return FormElement.objects.create(<a href="#id9"><span class="problematic" id="id10">**</span></a>validated_data)</dd>
+</dl>
+</dd>
+<dt>class FormElementsRetrieveSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">kwargs = serializers.DictField(source=’get_kwargs_dict’)
+value_present = serializers.SerializerMethodField(</p>
+<blockquote>
+<div>‘get_is_form_element_filled’)  # &lt;=================================</div></blockquote>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = FormElement
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘type’,
+‘css_class’,
+‘label’,
+‘placeholder’,
+‘name’,
+‘kwargs’,
+‘default’,
+‘order’,
+‘assign_to_var’,
+‘is_autofill’,
+‘value_present’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_is_form_element_filled(self, obj):</dt>
+<dd><p class="first">form_element = obj
+quote = self.context[‘task’].booking.quote
+s_num = self.context[‘s_num’]
+is_filled = FormElementValue.objects.filter(</p>
+<blockquote>
+<div>shipment__shipment_num=self.context[‘s_num’],
+# form_element__form=form,
+form_element=form_element,
+shipment__shipper_quote=self.context[‘task’].booking.quote,
+task=self.context[‘task’]</div></blockquote>
+<p class="last">).count() &gt;= 1
+return is_filled</p>
+</dd>
+<dt>def to_representation(self, instance):</dt>
+<dd><p class="first">result = super(FormElementsRetrieveSerializer, self).to_representation(instance)
+result[‘type’] = instance.get_type_display()</p>
+<dl class="docutils">
+<dt>result[‘default’] = instance.get_default_value(</dt>
+<dd>shipment_num=self.context[‘s_num’],
+task=self.context[‘task’]</dd>
+</dl>
+<p class="last">)
+# if instance.kwargs:
+#     result[‘kwargs’] = json.loads(instance.kwargs)
+return result</p>
+</dd>
+</dl>
+</dd>
+<dt>class FormElementsListSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">kwargs = serializers.DictField(source=’get_kwargs_dict’)
+value_present = serializers.SerializerMethodField(</p>
+<blockquote>
+<div>‘get_is_form_element_filled’)  # &lt;=================================</div></blockquote>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = FormElement
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘type’,
+‘css_class’,
+‘label’,
+‘placeholder’,
+‘name’,
+‘kwargs’,
+‘default’,
+‘order’,
+‘assign_to_var’,
+‘is_autofill’,
+‘value_present’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_is_form_element_filled(self, obj):</dt>
+<dd><p class="first">form_element = obj
+quote = self.context[‘task’].booking.quote
+s_num = self.context[‘s_num’]
+is_filled = FormElementValue.objects.filter(</p>
+<blockquote>
+<div>shipment__shipment_num=self.context[‘s_num’],
+# form_element__form=form,
+form_element=form_element,
+shipment__shipper_quote=self.context[‘task’].booking.quote,
+task=self.context[‘task’]</div></blockquote>
+<p class="last">).count() &gt;= 1
+return is_filled</p>
+</dd>
+<dt>def to_representation(self, instance):</dt>
+<dd><p class="first">result = super(FormElementsListSerializer, self).to_representation(instance)
+result[‘type’] = instance.get_type_display()</p>
+<dl class="docutils">
+<dt>result[‘default’] = instance.get_default_value(</dt>
+<dd>shipment_num=self.context[‘s_num’],
+task=self.context[‘task’]</dd>
+</dl>
+<p class="last">)
+# if instance.kwargs:
+#     result[‘kwargs’] = json.loads(instance.kwargs)
+return result</p>
+</dd>
+</dl>
+</dd>
+<dt>class FormSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">form_elements = FormElementsSerializer(source=’get_elements’, many=True, write_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Form
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘name’,
+‘description’,
+‘form_elements’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def validate_form_elements(self, value):</dt>
+<dd><dl class="first docutils">
+<dt>if len(value) &gt; 0:</dt>
+<dd><dl class="first last docutils">
+<dt>for index, i in enumerate(value):</dt>
+<dd><p class="first">j_values = value[index + 1:]
+for j in j_values:</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>if i[“name”] == j[“name”]:</dt>
+<dd>raise ValidationError(“Form elements should not have same name”)</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="last">return value</p>
+</dd>
+</dl>
+</dd>
+<dt>class FormRetrieveSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">form_elements = FormElementsRetrieveSerializer(source=’get_elements’, many=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Form
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘name’,
+‘description’,
+‘form_elements’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class FormElementValueDataSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = FormElementValue
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘value’,
+‘shipment’,
+‘form_element’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>class AbstractTaskSerializer(serializers.ModelSerializer):  # Do not use for update</p>
+<blockquote>
+<div><p>form = FormSerializer(required=False)</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = AbstractTask
+fields = (</p>
+<blockquote>
+<div><p>‘id’,
+‘task_name’,
+‘task_description’,
+‘task_type’,</p>
+<p>‘task_category’,
+‘task_for’,
+‘expiry’,
+‘escalate_at’,</p>
+<p>‘dependency_tasks’,
+‘trigger_tasks_on_completion’,</p>
+<p>‘mode_type’,
+‘hub_type’,
+‘is_incoming’,</p>
+<p>‘notify_stakeholders’,
+‘secondary_stakeholders’,</p>
+<p>‘notification_msg_short’,
+‘notification_msg_long’,
+‘notification_msg_title’,</p>
+<p>‘is_display_field’,
+‘display_name’,
+‘form’,
+‘trigger_tasks_on’,
+‘initiator_task’,
+‘estimated_completion_at’</p>
+</div></blockquote>
+<p>)
+extra_kwargs = {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>‘mode_type’: {</dt>
+<dd>‘required’: False</dd>
+</dl>
+<p>},
+‘hub_type’: {</p>
+<blockquote>
+<div>‘required’: False</div></blockquote>
+<p>},
+‘is_incoming’: {</p>
+<blockquote>
+<div>‘required’: False</div></blockquote>
+<p>},</p>
+</div></blockquote>
+<p class="last">}</p>
+</dd>
+<dt>def validate(self, attrs):</dt>
+<dd><p class="first">request = self.context[‘request’]</p>
+<dl class="docutils">
+<dt>if request.method.upper() == ‘PUT’ or request.method.upper() == ‘PATCH’:</dt>
+<dd>return attrs</dd>
+<dt>if attrs[‘task_type’] == TaskBaseModel.TASK_TYPE_FORM:</dt>
+<dd><dl class="first last docutils">
+<dt>if attrs[‘form’] is None:</dt>
+<dd><dl class="first docutils">
+<dt>raise serializers.ValidationError({</dt>
+<dd>‘form’: ‘’</dd>
+</dl>
+<p class="last">})</p>
+</dd>
+<dt>else:</dt>
+<dd>return attrs</dd>
+</dl>
+</dd>
+</dl>
+<p># else:
+#     if attrs[‘form’] is None:
+#         return attrs
+#     else:
+#         raise serializers.ValidationError({
+#             ‘form’: ‘’
+#         })
+else:</p>
+<blockquote class="last">
+<div>return attrs</div></blockquote>
+</dd>
+</dl>
+<p># def validate_mode_type(self, value):
+#     if value.content_type.id != 19:
+#         raise serializers.ValidationError(‘The dynamic table is not a mode’)
+#
+#     return value
+#
+# def validate_hub_type(self, value):
+#     if value.content_type.id != 18:
+#         raise serializers.ValidationError(‘The dynamic table is not a hub’)
+#
+#     return value</p>
+<dl class="docutils">
+<dt>def validate_display_name(self, value):</dt>
+<dd><dl class="first docutils">
+<dt>if value == ‘’:</dt>
+<dd>return None</dd>
+</dl>
+<p class="last">return value</p>
+</dd>
+<dt>def create(self, validated_data):</dt>
+<dd><dl class="first docutils">
+<dt>if ‘form’ in validated_data:</dt>
+<dd>form_data = validated_data.pop(‘form’)</dd>
+</dl>
+<p>form = None</p>
+<dl class="docutils">
+<dt>if validated_data[‘task_type’] == AbstractTask.TASK_TYPE_FORM:</dt>
+<dd><p class="first">form_elements_data = form_data.pop(‘get_elements’)
+form = Form.objects.create(<a href="#id11"><span class="problematic" id="id12">**</span></a>form_data)</p>
+<dl class="last docutils">
+<dt>for form_element_data in form_elements_data:</dt>
+<dd>form_element_data[‘kwargs’] = json.dumps(form_element_data.pop(‘get_kwargs_dict’))
+FormElement.objects.create(form=form, <a href="#id13"><span class="problematic" id="id14">**</span></a>form_element_data)</dd>
+</dl>
+</dd>
+</dl>
+<p class="last">return AbstractTask.objects.create(form=form, <a href="#id15"><span class="problematic" id="id16">**</span></a>validated_data)</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>class TaskDataSerializer(serializers.Serializer):</dt>
+<dd><dl class="first docutils">
+<dt>def __init__(self, task, shipment_num=None, is_create=False, <a href="#id17"><span class="problematic" id="id18">**</span></a>kwargs):</dt>
+<dd><p class="first">super(TaskDataSerializer, self).__init__(<a href="#id19"><span class="problematic" id="id20">**</span></a>kwargs)</p>
+<p>self.task = task
+self.shipment_num = shipment_num
+self.shipment = Shipment.objects.get(</p>
+<blockquote>
+<div>shipper_quote=task.booking.quote,
+shipment_num=self.shipment_num</div></blockquote>
+<p>)</p>
+<p>self.is_create = is_create</p>
+<p>self.required_count = 0</p>
+<p># if self.shipment_num:
+#     self.instance = self._get_instance()</p>
+<p>self.field_form_element = {}</p>
+<p class="last">self._declared_fields = self._get_declared_fields()</p>
+</dd>
+</dl>
+<p>def update_task_variable(self, form_element, value):</p>
+<blockquote>
+<div><p>if form_element.assign_to_var:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if ‘[i]’ in form_element.assign_to_var:</dt>
+<dd>index_type = TaskVariable.TYPE_INDEX_ALL
+index = self.shipment_num</dd>
+<dt>elif ‘[v]’ in form_element.assign_to_var:</dt>
+<dd>index_type = TaskVariable.TYPE_INDEX_VENDOR
+# index = self.shipment_num
+bookings = self.task.leg.leg_booking
+booking = self.task.leg.leg_booking.get(shipmentbooking__shipment__shipment_num=self.shipment_num)
+index = booking.booking_index</dd>
+<dt>else:</dt>
+<dd>index_type = TaskVariable.TYPE_INDEX_NONE
+index = 0</dd>
+<dt>TaskVariable.objects.update_or_create(</dt>
+<dd>index_type=index_type,
+index=index,
+# value=value,
+cp_booking=self.shipment.shipper_quote.cpbooking,
+name=form_element.assign_to_var.replace(‘[i]’, ‘’).replace(‘[v]’, ‘’),
+defaults={‘value’: value}</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>if form_element.assign_to_var == ‘container_num’:</dt>
+<dd>self.shipment.container_num = value
+self.shipment.save()</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<p>def create_form_element_value(self, form_element, value, shipment):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if self.task.task_category == Task.TASK_CATEGORY_BLOCKCHAIN and value:</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd>self.task.create_blockchain(shipment)</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+</dd>
+<dt>try:</dt>
+<dd>self.task.make_booking_inactive(shipment)</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+<dt>if form_element.type == FormElement.TYPE_CHOICE_FILE:</dt>
+<dd><dl class="first docutils">
+<dt>fev_original = FormElementValue.objects.create(</dt>
+<dd>value=’pending’,
+shipment=shipment,
+form_element=form_element,
+task=self.task</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>file_doc = FileFormElementValue.objects.create(</dt>
+<dd>form_element_value=fev_original,
+doc=value</dd>
+</dl>
+<p>)</p>
+<p>fev_original.value = file_doc.doc.url
+fev_original.save()</p>
+<p class="last">return fev_original</p>
+</dd>
+</dl>
+<p>else:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>return FormElementValue.objects.create(</dt>
+<dd>value=value,
+shipment=shipment,
+form_element=form_element,
+task=self.task</dd>
+</dl>
+<p>)</p>
+</div></blockquote>
+</div></blockquote>
+<p>def create(self, validated_data):</p>
+<blockquote>
+<div><p>request_stakeholder = self.context[‘request’].user.stakeholder</p>
+<dl class="docutils">
+<dt>if settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">request_stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_VENDOR:
+if Shipment.objects.filter(</p>
+<blockquote>
+<div>shipper_quote=self.task.booking.quote,
+shipment_num=self.shipment_num,
+shipment_booking__vendor_booking__service_provider=self.context[‘request’].user.stakeholder</div></blockquote>
+<dl class="last docutils">
+<dt>).count() is not 1:</dt>
+<dd>raise serializers.ValidationError({‘detail’: ‘not authorized’})</dd>
+</dl>
+</dd>
+<dt>if not self.task.task_for == request_stakeholder:</dt>
+<dd>raise serializers.ValidationError({‘detail’: ‘this task is not for you’})</dd>
+</dl>
+<p>value_flag = True</p>
+<p>if self.task.task_type == Task.TASK_TYPE_ACK:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>for v in validated_data.values():</dt>
+<dd>value_flag &amp;= v</dd>
+</dl>
+<p>if not value_flag:</p>
+<blockquote>
+<div><p>curr_task_copy = deepcopy(self.task)
+curr_task_copy.id = None
+curr_task_copy.is_active = True</p>
+<p># curr_form = curr_task_copy.form
+# curr_form.id = None
+# curr_form.save()
+#
+# curr_task_copy.form = curr_form
+# curr_task_copy.formelementvalue_set.all().update(value=None)
+curr_task_copy.completed_percentage = 0
+curr_task_copy.save()</p>
+<p>curr_task_copy.trigger_tasks_on_completion.clear()
+curr_task_copy.dependency_tasks.clear()</p>
+<dl class="docutils">
+<dt>for trg in self.task.trigger_tasks_on_completion.all():</dt>
+<dd>curr_task_copy.trigger_tasks_on_completion.add(trg)</dd>
+</dl>
+<p>self.task.trigger_tasks_on_completion.clear()</p>
+<dl class="docutils">
+<dt>for task in self.task.dependency_tasks.all():</dt>
+<dd><p class="first">task.id = None
+task.is_active = True
+task.expiry = 4320
+task.escalation = 2880
+task.triggered_at = timezone.now()
+task.completed_at = None
+task.completed_percentage = 0
+# task.is_active = True
+# task.formelementvalue_set.all().update(value=None)
+task.save()</p>
+<p>task.trigger_tasks_on_completion.clear()</p>
+<p class="last">task.trigger_tasks_on_completion.add(curr_task_copy)
+curr_task_copy.dependency_tasks.add(task)</p>
+</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<dl class="docutils">
+<dt>else:</dt>
+<dd>pass</dd>
+<dt>for key, value in validated_data.items():</dt>
+<dd><p class="first">form_element = self.task.get_form_element_by_name(key)</p>
+<p>if form_element.is_autofill:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>shipment_set = Shipment.objects.filter(</dt>
+<dd>shipper_quote=self.task.booking.quote</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>if self.task.is_task_for_vendor():</dt>
+<dd><dl class="first docutils">
+<dt>shipment_set.filter(</dt>
+<dd>shipment_booking__vendor_booking__service_provider=request_stakeholder</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>for shipment in shipment_set:</dt>
+<dd><dl class="first docutils">
+<dt>self.create_form_element_value(</dt>
+<dd>form_element=form_element,
+shipment=shipment,
+value=value</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>self.update_task_variable(</dt>
+<dd>form_element=form_element,
+value=value</dd>
+</dl>
+<p>)</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>else:</dt>
+<dd><dl class="first docutils">
+<dt>self.create_form_element_value(</dt>
+<dd>form_element=form_element,
+shipment=self.shipment,
+value=value</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>self.update_task_variable(</dt>
+<dd>form_element=form_element,
+value=value</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>completed_form_element_values = FormElementValue.objects.filter(</dt>
+<dd>form_element__form=self.task.form,
+shipment__shipper_quote=self.task.booking.quote,
+task=self.task</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>if self.task.is_task_for_vendor():</dt>
+<dd><dl class="first last docutils">
+<dt>completed_form_element_values = completed_form_element_values.filter(</dt>
+<dd>shipment__shipment_booking__vendor_booking__service_provider=request_stakeholder).distinct()</dd>
+</dl>
+</dd>
+<dt>else:</dt>
+<dd><dl class="first last docutils">
+<dt>completed_form_element_values = completed_form_element_values.filter(</dt>
+<dd>shipment__shipper_quote__stakeholder=request_stakeholder).distinct()</dd>
+</dl>
+</dd>
+<dt>if completed_form_element_values.count() &gt;= self.task.form.formelement_set.filter(</dt>
+<dd><blockquote class="first">
+<div>kwargs__icontains=‘“required: true”’).distinct().count():</div></blockquote>
+<p class="last">self.task.mark_as_completed()</p>
+</dd>
+</dl>
+<dl class="docutils">
+<dt>instance = self.task.get_form_data_instance(</dt>
+<dd>shipment_num=self.shipment_num,</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>if instance:</dt>
+<dd>self.task.mark_as_partially_completed()</dd>
+</dl>
+<p>return instance</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>def update(self, instance, validated_data):</dt>
+<dd>return instance.update(<a href="#id21"><span class="problematic" id="id22">**</span></a>validated_data)</dd>
+<dt>def _get_declared_fields(self):</dt>
+<dd><p class="first">fields = []</p>
+<dl class="docutils">
+<dt>for form_element in self.task.form.formelement_set.all().order_by(‘order’):</dt>
+<dd><p class="first">field = TaskDataSerializer._get_field_by_form_element(form_element)
+self.field_form_element[form_element.name] = form_element</p>
+<dl class="last docutils">
+<dt>if field:</dt>
+<dd><dl class="first last docutils">
+<dt>if form_element.is_autofill and FormElementValue.objects.filter(</dt>
+<dd>form_element=form_element,
+shipment=self.shipment,
+task=self.task</dd>
+<dt>):</dt>
+<dd><dl class="first last docutils">
+<dt>if not self.is_create:</dt>
+<dd>fields.append(field)</dd>
+</dl>
+</dd>
+<dt>else:</dt>
+<dd>fields.append(field)</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+<p># check_form_elements = []
+# for form_element in self.task.form.formelement_set.all().order_by(‘order’):
+#     check_form_elements.append(form_element.name)
+#
+# cfe = check_form_elements</p>
+<p># for form_element in self.task.form.formelement_set.all().order_by(‘order’):
+#     try:
+#         form_element_value = FormElementValue.objects.get(
+#             form_element=form_element,
+#             shipment=self.shipment
+#         )
+#         field = TaskDataSerializer._get_field_by_form_element(form_element)
+#         self.field_form_element[form_element.name] = form_element
+#
+#         if field:
+#             fields.append(field)
+#     except:
+#         continue</p>
+<p class="last">return OrderedDict(fields)</p>
+</dd>
+</dl>
+<p>&#64;property
+def fields(self):</p>
+<blockquote>
+<div><p>“””
+A dictionary of {field_name: field_instance}.
+“””
+# <cite>fields</cite> is evaluated lazily. We do this to ensure that we don’t
+# have issues importing modules that use ModelSerializers as fields,
+# even if Django’s app-loading stage has not yet run.
+self._fields = BindingDict(self)
+for value in self.get_fields().items():</p>
+<blockquote>
+<div>self._fields[value[0]] = value[1]
+valueA = value[0]
+valueB = value[1]
+valueC = self._fields[value[0]]
+c = valueC</div></blockquote>
+<p>return self._fields</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>def _get_instance(self):</dt>
+<dd>return self.task.get_form_data_instance(self.shipment_num)</dd>
+</dl>
+<p>&#64;staticmethod
+def _get_field_by_form_element(form_element):</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>if form_element.type == FormElement.TYPE_CHOICE_TEXT:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.CharField(</dt>
+<dd>required=form_element.get_kwarg(‘required’),
+max_length=form_element.get_kwarg(‘max_length’),
+validators=form_element.get_validators()  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>elif form_element.type == FormElement.TYPE_CHOICE_DECIMAL:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.DecimalField(</dt>
+<dd>required=form_element.get_kwarg(‘required’),
+max_digits=form_element.get_kwarg(‘max_digits’),
+decimal_places=form_element.get_kwarg(‘decimal_places’),
+validators=form_element.get_validators()  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>elif form_element.type == FormElement.TYPE_CHOICE_CHOICE:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.CharField(</dt>
+<dd>max_length=form_element.get_kwarg(‘max_length’),
+required=form_element.get_kwarg(‘required’),
+validators=form_element.get_validators()  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>elif form_element.type == FormElement.TYPE_CHOICE_LAT_LNG:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.CharField(</dt>
+<dd>required=form_element.get_kwarg(‘required’),
+# max_length=26,
+max_length=45,
+validators=form_element.get_validators()  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>elif form_element.type == FormElement.TYPE_CHOICE_FILE:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.FileField(</dt>
+<dd>required=form_element.get_kwarg(‘required’),
+validators=form_element.get_validators()  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>elif form_element.type == FormElement.TYPE_CHOICE_CHECKBOX:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.NullBooleanField(</dt>
+<dd>required=form_element.get_kwarg(‘required’),
+validators=form_element.get_validators()  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>elif form_element.type == FormElement.TYPE_CHOICE_DATETIME:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.DateTimeField(</dt>
+<dd>required=form_element.get_kwarg(‘required’),
+validators=form_element.get_validators(),  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+<dt>elif form_element.type == FormElement.TYPE_CHOICE_INTEGER:</dt>
+<dd><dl class="first docutils">
+<dt>return (</dt>
+<dd><dl class="first docutils">
+<dt>form_element.name, serializers.IntegerField(</dt>
+<dd>required=form_element.get_kwarg(‘required’),
+max_value=form_element.get_kwarg(‘max_value’),
+min_value=form_element.get_kwarg(‘min_value’),
+validators=form_element.get_validators()  # func(value)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>return None</p>
+</div></blockquote>
+</dd>
+<dt>class TaskVariableSerializerModel:</dt>
+<dd><dl class="first docutils">
+<dt>def __init__(self, var_names, cp_booking_id, stakeholder):</dt>
+<dd>self.var_names = var_names
+self.cp_booking_id = cp_booking_id
+self.stakeholder = stakeholder
+self.query_set = self.get_query_set()</dd>
+</dl>
+<p>def get_query_set(self):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>ttvv = TaskVariable.objects.filter(cp_booking__quote__stakeholder=self.stakeholder).filter(</dt>
+<dd>Q(cp_booking_id=self.cp_booking_id) |
+Q(cp_booking__cp_booking_number=self.cp_booking_id)</dd>
+</dl>
+<p>).filter(name__in=self.var_names)
+ttvv2 = ttvv
+return ttvv</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def data(self):</dt>
+<dd><p class="first">vars = {}
+# cp_booking = CPBooking.objects.get(pk=self.cp_booking_id)
+qs = self.query_set
+qs2 = qs
+check_var_names = self.var_names
+for var in self.query_set:</p>
+<blockquote>
+<div><p># if var.is_indiced:
+#     vars.setdefault(
+#         var.name,
+#         {
+#             ‘name’: var.name,
+#             ‘is_indiced’: True,
+#             ‘values’: []
+#         }
+#     )[‘values’].append(
+#         {
+#             ‘shipment_num’: var.index,
+#             ‘value’: var.value
+#         }
+#     )
+# else:
+#     vars[var.name] = {
+#         ‘name’: var.name,
+#         ‘is_indiced’: False,
+#         ‘value’: var.value
+#     }</p>
+<dl class="docutils">
+<dt>if var.index_type == TaskVariable.TYPE_INDEX_ALL:</dt>
+<dd><dl class="first docutils">
+<dt>vars.setdefault(</dt>
+<dd><p class="first">var.name,
+{</p>
+<blockquote>
+<div>‘name’: var.name,
+‘index_type’: var.index_type,
+‘values’: []</div></blockquote>
+<p class="last">}</p>
+</dd>
+<dt>)[‘values’].append(</dt>
+<dd><dl class="first docutils">
+<dt>{</dt>
+<dd>‘shipment_num’: var.index,
+‘value’: var.value</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p class="last">)
+v = var
+vv = v</p>
+</dd>
+</dl>
+<p>elif var.index_type == TaskVariable.TYPE_INDEX_VENDOR:</p>
+<blockquote>
+<div><p>cpb = CPBooking.objects.get(pk=self.cp_booking_id)
+q = cpb.quote
+b = Booking.objects.get(quote=q, booking_index=var.index)
+sb = ShipmentBooking.objects.filter(vendor_booking=b)
+j = []
+for k in sb:</p>
+<blockquote>
+<div>j.append(k.shipment.shipment_num)</div></blockquote>
+<p>j.sort()
+# sb = ShipmentBooking.objects.filter(vendor_booking=‘4fb95b80-f35b-4126-af69-ee27f276e4dd’)</p>
+<dl class="docutils">
+<dt>vars.setdefault(</dt>
+<dd><p class="first">var.name,
+{</p>
+<blockquote>
+<div>‘name’: var.name,
+‘index_type’: var.index_type,
+‘values’: []
+# ‘container_nos’: []</div></blockquote>
+<p class="last">}</p>
+</dd>
+<dt>)[‘values’].append(</dt>
+<dd><dl class="first docutils">
+<dt>{</dt>
+<dd>‘booking_num’: var.index,
+‘value’: var.value,
+# ‘shipment_num’: j.sort()
+‘shipment_num’: j</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>)
+# )[‘container_nos’].append(
+#     {
+#         ‘shiment_num’:
+#     }
+# )
+v = var
+vv = v</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>else:</dt>
+<dd><dl class="first docutils">
+<dt>vars[var.name] = {</dt>
+<dd>‘name’: var.name,
+‘index_type’: TaskVariable.TYPE_INDEX_NONE,
+‘value’: var.value</dd>
+</dl>
+<p class="last">}
+v = var
+vv = v</p>
+</dd>
+</dl>
+</div></blockquote>
+<p class="last">return vars</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="t-model.html"
+                        title="previous chapter">task.models</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/t-serializer.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="t-model.html" title="task.models"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

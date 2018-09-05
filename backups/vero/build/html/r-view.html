@@ -1,0 +1,438 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>rates.views &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="rates.models" href="r-model.html" />
+    <link rel="prev" title="quote.serializer" href="q-serializer.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="r-model.html" title="rates.models"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="q-serializer.html" title="quote.serializer"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="rates-views">
+<h1>rates.views<a class="headerlink" href="#rates-views" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>from django.utils import timezone
+# Create your views here.
+from rest_framework import generics
+from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView</p>
+<p>from camelport import settings
+from quote.models import Quote
+from rates.models import Rates, Charges, AbstractTypeCharges, ChargeDescription, AbstractPenalty
+from rates.serializer import RatesSerializer, ChargeDescriptionSerializer, ChargesLCSerializer, </p>
+<blockquote>
+<div>BidPageAbPenaltySerializer, AbstractTypeChargesSerializer, BidPageAbChargesSerializer, VendorBidChargesPenaltyRetrieveSerializer, AbstractPenaltySerializer, VendorBidChargesPenaltyUpdateSerializer, ContractsSerializer, BidPageChargesSerializer</div></blockquote>
+<p>from utils.metadata import CPMeta
+from utils.pagination import CamelportPagination, Camelport15Pagination
+# Create your views here.
+from utils.permissions import VendorOnlyAccessPermission, ShipperOnlyAccessPermission</p>
+<dl class="docutils">
+<dt>class RatesListCreateAPIView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta
+serializer_class = RatesSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Rates.objects.filter(rate_type=Rates.RATE_TYPE_SPOT, is_cancelled=False)</dd>
+<dt>def get_serializer_context(self):</dt>
+<dd>context = super(RatesListCreateAPIView, self).get_serializer_context()
+context[‘stakeholder’] = self.request.user.stakeholder
+return context</dd>
+</dl>
+</dd>
+<dt>class ContractsListCreateAPIView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">pagination_class = Camelport15Pagination
+metadata_class = CPMeta
+serializer_class = ContractsSerializer
+permission_classes = [VendorOnlyAccessPermission, ]</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first last docutils">
+<dt>return Rates.objects.filter(rate_type=Rates.RATE_TYPE_CONTRACT, service_provider=self.request.user.stakeholder,</dt>
+<dd>is_cancelled=False)</dd>
+</dl>
+</dd>
+<dt>def get_serializer_context(self):</dt>
+<dd>context = super(ContractsListCreateAPIView, self).get_serializer_context()
+context[‘stakeholder’] = self.request.user.stakeholder
+return context</dd>
+</dl>
+</dd>
+<dt>class RatesRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">serializer_class = RatesSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Rates.objects.all()</dd>
+<dt>def get_serializer_context(self):</dt>
+<dd>context = super(RatesRetrieveUpdateDestroyAPIView, self).get_serializer_context()
+context[‘stakeholder’] = self.request.user.stakeholder
+return context</dd>
+</dl>
+</dd>
+</dl>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class ChargeDescriptionListCreateApiView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return ChargeDescription.objects.all()</dd>
+</dl>
+<p class="last">serializer_class = ChargeDescriptionSerializer</p>
+</dd>
+<dt>class ChargeDescriptionRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return ChargeDescription.objects.all()</dd>
+</dl>
+</dd>
+</dl>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class AbstractTaskPenaltiesRUDAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">serializer_class = AbstractPenaltySerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd># absTask = AbstractTask.objects.get(pk=)
+return AbstractPenalty.objects.filter()
+#     return Penalty.objects.filter(
+#         for_abtask_id=self.kwargs[‘pk’]
+#     )
+#
+# def get_penalty_object(self):
+#         return self.queryset.get(pk=self.kwargs[‘penalty’])</dd>
+</dl>
+</dd>
+<dt>class RelevantChargeListForQuote(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = None
+permission_classes = [VendorOnlyAccessPermission, ]
+serializer_class = AbstractTypeChargesSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>quote = get_object_or_404(Quote, pk=self.kwargs.get(‘quote_id’, 1))
+hub_list = quote.get_hub_list()
+return AbstractTypeCharges.objects.filter(hub__in=hub_list).distinct()</dd>
+</dl>
+</dd>
+<dt>class RelevantPenaltyList(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = None
+permission_classes = [IsAuthenticated, ]
+serializer_class = BidPageAbPenaltySerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return AbstractPenalty.objects.filter(</dt>
+<dd>stakeholder_type=self.request.user.stakeholder.dynamic_table</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class PenaltyListCreateApiView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">pagination_class = None
+metadata_class = CPMeta</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return AbstractPenalty.objects.filter(</dt>
+<dd>stakeholder=self.request.user.stakeholder</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">serializer_class = AbstractPenaltySerializer</p>
+</dd>
+<dt>class PenaltyRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return AbstractPenalty.objects.all()</dd>
+</dl>
+</dd>
+<dt>class PenaltyList(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = AbstractPenaltySerializer
+pagination_class = None</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return AbstractPenalty.objects.all()</dd>
+</dl>
+</dd>
+<dt>class PenaltyLatest(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = BidPageAbPenaltySerializer
+pagination_class = None
+permission_classes = [IsAuthenticated, ]</p>
+<p>def get_queryset(self):</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>if settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.request.user.stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_CUSTOMER:</p>
+<dl class="docutils">
+<dt>return AbstractPenalty.objects.filter(</dt>
+<dd>child_penalty__penalty_cp_booking__cp_booking__quote__stakeholder=self.request.user.stakeholder</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+<dt>elif settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.request.user.stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_VENDOR:</p>
+<dl class="docutils">
+<dt>return AbstractPenalty.objects.filter(</dt>
+<dd>child_penalty__penalty_booking__booking__service_provider=self.request.user.stakeholder</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+<dt>class ShipperPenaltyLatest(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = BidPageAbPenaltySerializer
+pagination_class = None
+permission_classes = [IsAuthenticated, ]</p>
+<p>def get_queryset(self):</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>if settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.request.user.stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_CUSTOMER:</p>
+<dl class="docutils">
+<dt>return AbstractPenalty.objects.filter(</dt>
+<dd>child_penalty__penalty_cp_booking__cp_booking__quote__stakeholder=self.request.user.stakeholder</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+<dt>elif settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">self.request.user.stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_IDENTIFIERS[‘SHIPPER’]:</p>
+<dl class="docutils">
+<dt>return AbstractPenalty.objects.filter(</dt>
+<dd>child_penalty__penalty_booking__booking__service_provider=self.request.user.stakeholder</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+<dt>class ChargesLCApiView(generics.ListCreateAPIView):</dt>
+<dd>serializer_class = ChargesLCSerializer
+queryset = Charges.objects.all()</dd>
+<dt>class ChargeLatest(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = BidPageAbChargesSerializer
+pagination_class = None
+permission_classes = [VendorOnlyAccessPermission, ]</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return AbstractTypeCharges.objects.filter(</dt>
+<dd>child_charge__chargeforbooking__booking__service_provider=self.request.user.stakeholder</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class ShipperChargeLatest(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = BidPageAbChargesSerializer
+pagination_class = None
+permission_classes = [ShipperOnlyAccessPermission, ]</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return AbstractTypeCharges.objects.filter(</dt>
+<dd>child_charge__chargeforbooking__booking__service_provider=self.request.user.stakeholder</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class AbstractChargesLCApiView(generics.ListCreateAPIView):</dt>
+<dd>pagination_class = None
+serializer_class = AbstractTypeChargesSerializer
+queryset = AbstractTypeCharges.objects.all()</dd>
+<dt>class AbstractChargeDescriptionRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">pagination_class = None</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return AbstractTypeCharges.objects.all()</dd>
+</dl>
+</dd>
+</dl>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class BidStatsApiView(APIView):</dt>
+<dd><p class="first">permission_classes = [VendorOnlyAccessPermission, ]</p>
+<dl class="last docutils">
+<dt>def get(self, request, <a href="#id1"><span class="problematic" id="id2">*</span></a>args, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs):</dt>
+<dd><dl class="first docutils">
+<dt>rates_queryset = Rates.objects.filter(</dt>
+<dd>service_provider=request.user.stakeholder,
+rate_expiry_date__gte=timezone.now()</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>bid_stats = {</dt>
+<dd><dl class="first docutils">
+<dt>‘winning’: RatesSerializer(</dt>
+<dd>rates_queryset.filter(winningbids__isnull=False).order_by(‘rate_for_date’).distinct()[:5],
+many=True</dd>
+</dl>
+<p>).data,
+‘losing’: RatesSerializer(</p>
+<blockquote>
+<div>rates_queryset.filter(winningbids__isnull=True).order_by(‘rate_for_date’).distinct()[:5],
+many=True</div></blockquote>
+<p class="last">).data</p>
+</dd>
+</dl>
+<p>}</p>
+<p class="last">return Response(bid_stats)</p>
+</dd>
+</dl>
+</dd>
+<dt>class VendorBidChargesPenaltyRetrieve(generics.RetrieveAPIView):</dt>
+<dd><p class="first">pagination_class = None
+serializer_class = VendorBidChargesPenaltyRetrieveSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd># return Quote.objects.filter(booking__service_provider=self.request.user.stakeholder).distinct()
+return Quote.objects.all()</dd>
+<dt>def get_serializer_context(self):</dt>
+<dd><p class="first">context = super(VendorBidChargesPenaltyRetrieve, self).get_serializer_context()
+context.update({</p>
+<blockquote>
+<div>‘stakeholder’: self.request.user.stakeholder</div></blockquote>
+<p class="last">})
+return context</p>
+</dd>
+</dl>
+</dd>
+<dt>class VendorBidUpdateChargesPenaltyRetrieve(generics.RetrieveAPIView):</dt>
+<dd><p class="first">pagination_class = None
+serializer_class = VendorBidChargesPenaltyUpdateSerializer</p>
+<dl class="last docutils">
+<dt>def __init__(self, <a href="#id5"><span class="problematic" id="id6">**</span></a>kwargs):</dt>
+<dd>super(VendorBidUpdateChargesPenaltyRetrieve, self).__init__(<a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs)
+self.rate_instance = None</dd>
+<dt>def get_queryset(self):</dt>
+<dd># return Quote.objects.filter(booking__service_provider=self.request.user.stakeholder).distinct()
+return Quote.objects.all()</dd>
+<dt>def get_serializer_context(self):</dt>
+<dd><p class="first">context = super(VendorBidUpdateChargesPenaltyRetrieve, self).get_serializer_context()
+self.rate_instance = get_object_or_404(Rates, pk=self.kwargs.get(‘rate_id’, 1))
+context.update({</p>
+<blockquote>
+<div>‘stakeholder’: self.request.user.stakeholder,
+‘rate’: self.rate_instance</div></blockquote>
+<p class="last">})
+return context</p>
+</dd>
+</dl>
+</dd>
+<dt>class ChargesAndPenaltiesForHubsListView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = None
+serializer_class = BidPageChargesSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>hub_ids = self.kwargs.get(‘hubs’).split(‘,’)
+return Charges.objects.filter(abstract_charge__hub__id__in=hub_ids)</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="q-serializer.html"
+                        title="previous chapter">quote.serializer</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="r-model.html"
+                        title="next chapter">rates.models</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/r-view.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="r-model.html" title="rates.models"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="q-serializer.html" title="quote.serializer"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

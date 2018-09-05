@@ -1,0 +1,319 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>hubs.serializers &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="quote.view" href="q-view.html" />
+    <link rel="prev" title="hubs.models" href="h-model.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="q-view.html" title="quote.view"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="h-model.html" title="hubs.models"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hubs-serializers">
+<h1>hubs.serializers<a class="headerlink" href="#hubs-serializers" title="Permalink to this headline">¶</a></h1>
+<p>from copy import copy</p>
+<p>import googlemaps
+from cities_light.models import Country
+from django.conf import settings
+from rest_framework import serializers</p>
+<p>from cp_eav.models import DynamicTable
+from cp_qb.models import SubUsers
+from cp_qb.subusers_helpers import create_qb_customer_for_billing_address
+from hubs.models import Hubs</p>
+<dl class="docutils">
+<dt>class HubsSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">gst = serializers.CharField(max_length=15, required=False, allow_null=True, allow_blank=True, source=’get_gst’)</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Hubs
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘name’,
+‘address_country’,
+‘address_lat’,
+‘address_lng’,
+‘address_line_1’,
+‘address_line_11’,
+‘address_line_2’,
+‘address_line_3’,
+# ‘incoming_modes’,
+# ‘outgoing_modes’,
+‘stakeholder’,
+‘dynamic_table’,
+‘address_state’,
+‘address_zipcode’,
+‘gst’,</div></blockquote>
+<p>)
+extra_kwargs = {</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>‘address_country’: {</dt>
+<dd>‘required’: True</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>def create(self, validated_data):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if ‘get_gst’ in validated_data:</dt>
+<dd>gst = validated_data.pop(‘get_gst’)</dd>
+<dt>else:</dt>
+<dd>gst = None</dd>
+</dl>
+<p>trade_name = None</p>
+<dl class="docutils">
+<dt>if ‘dynamic_table’ in validated_data:</dt>
+<dd><dl class="first last docutils">
+<dt>if validated_data[‘dynamic_table’] is None:</dt>
+<dd>trade_name = copy(validated_data[‘name’])
+validated_data = self.set_stk_hub(validated_data)</dd>
+</dl>
+</dd>
+<dt>else:</dt>
+<dd>trade_name = copy(validated_data[‘name’])
+validated_data = self.set_stk_hub(validated_data)</dd>
+</dl>
+<p>instance = Hubs.objects.create(<a href="#id1"><span class="problematic" id="id2">**</span></a>validated_data)</p>
+<p>self.set_lat_lng(instance)</p>
+<dl class="docutils">
+<dt>if instance.stakeholder:</dt>
+<dd>self.create_subuser(instance, gst, trade_name)</dd>
+</dl>
+<p>return instance</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def set_stk_hub(self, validated_data):</dt>
+<dd><p class="first">stakeholder = self.context[‘request’].user.stakeholder</p>
+<p>dynamic_table = None</p>
+<dl class="docutils">
+<dt>if settings.STAKEHOLDER_TYPE[stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_CUSTOMER:</dt>
+<dd>dynamic_table = DynamicTable.objects.get(table_name=settings.HUB_IDENTIFIERS[‘FACTORY’])</dd>
+<dt>elif settings.STAKEHOLDER_TYPE[stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_VENDOR:</dt>
+<dd>dynamic_table = DynamicTable.objects.get(table_name=settings.HUB_IDENTIFIERS[‘VENDOR’])</dd>
+</dl>
+<p class="last">validated_data[‘dynamic_table’] = dynamic_table
+validated_data[‘stakeholder’] = stakeholder
+validated_data[‘name’] = validated_data[‘address_line_3’]
+return validated_data</p>
+</dd>
+<dt>def set_lat_lng(self, instance):</dt>
+<dd><p class="first">gmaps = googlemaps.Client(key=settings.GOOGLE_MAPS_API_KEY)</p>
+<dl class="docutils">
+<dt>geocode_result = gmaps.geocode(‘{pincode}, {country_code}’.format(</dt>
+<dd>pincode=instance.address_zipcode,
+country_code=instance.address_country.code2</dd>
+</dl>
+<p>))</p>
+<dl class="docutils">
+<dt>if len(geocode_result) &gt; 0:</dt>
+<dd>location = geocode_result[0][“geometry”][‘location’]
+instance.address_lat, instance.address_lng = location[‘lat’], location[‘lng’]
+instance.save()</dd>
+</dl>
+<p class="last">return None, None</p>
+</dd>
+<dt>def create_subuser(self, instance, gst, trade_name):</dt>
+<dd><p class="first">parent_ref = instance.stakeholder.quickbooks_customer</p>
+<dl class="docutils">
+<dt>subuser = SubUsers.objects.create(</dt>
+<dd>parent_stakeholder=instance.stakeholder,
+parent_id=parent_ref,
+display_name=instance.name,
+pincode=instance.address_zipcode,
+place=instance.address_line_3,
+state=instance.address_state,
+address1=instance.address_line_1,
+address2=instance.address_line_2,
+gst=gst,
+hub=instance,
+trade_name=trade_name</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd>create_qb_customer_for_billing_address(subuser)</dd>
+<dt>except Exception as exc:</dt>
+<dd>pass</dd>
+</dl>
+<p class="last">return subuser</p>
+</dd>
+</dl>
+</dd>
+<dt>class HubsShortSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Hubs
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘name’,
+‘address_country’,
+‘address_lat’,
+‘address_lng’,
+‘address_line_1’,
+‘address_line_11’,
+‘address_line_2’,
+‘address_line_3’,
+‘stakeholder’,
+‘dynamic_table’,
+‘address_state’,
+‘address_zipcode’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class HubsNameSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Hubs
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘name’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class HubsAutoCompleteSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">country = serializers.CharField(source=’address_country.name_ascii’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Hubs
+fields = (</p>
+<blockquote>
+<div>“id”,
+“name”,
+“country”,
+“stakeholder”</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class HubsPostContractSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Hubs
+fields = (</p>
+<blockquote>
+<div>‘id’,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class CitiesLightCountrySerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">mobile_country_code = serializers.SerializerMethodField()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Country
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘name’,
+‘mobile_country_code’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def get_mobile_country_code(self, object):</dt>
+<dd>return ‘+’ + object.phone</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="h-model.html"
+                        title="previous chapter">hubs.models</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="q-view.html"
+                        title="next chapter">quote.view</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/h-serializer.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="q-view.html" title="quote.view"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="h-model.html" title="hubs.models"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>hubs.models &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="hubs.serializers" href="h-serializer.html" />
+    <link rel="prev" title="hubs.views" href="h-view.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="h-serializer.html" title="hubs.serializers"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="h-view.html" title="hubs.views"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hubs-models">
+<h1>hubs.models<a class="headerlink" href="#hubs-models" title="Permalink to this headline">¶</a></h1>
+<p>from __future__ import unicode_literals</p>
+<p>from django.db import models</p>
+<p># Create your models here.
+import eav
+from modes.models import Modes
+from stakeholder.models import Stakeholder
+from utils.models import DateBaseModel</p>
+<dl class="docutils">
+<dt>class Hubs(DateBaseModel):</dt>
+<dd><p class="first">IS_CHARGE_UNIT_TIME_HOUR = 24
+IS_CHARGE_UNIT_TIME_DAY = 1
+IS_CHARGE_UNIT_TIME_WEEK = 1 / 7
+IS_CHARGE_UNIT_TIME_MONTH = 1 / 30.5</p>
+<dl class="docutils">
+<dt>IS_CHARGE_UNIT_TIME_CHOICES = (</dt>
+<dd>(IS_CHARGE_UNIT_TIME_HOUR, ‘per hour’),
+(IS_CHARGE_UNIT_TIME_DAY, ‘per day’),
+(IS_CHARGE_UNIT_TIME_WEEK, ‘per week’),
+(IS_CHARGE_UNIT_TIME_MONTH, ‘per month’)</dd>
+</dl>
+<p>)</p>
+<p>name = models.CharField(max_length=64)
+address_line_1 = models.CharField(max_length=256, blank=True, null=True)
+address_line_11 = models.CharField(max_length=256, blank=True, null=True)
+address_line_2 = models.CharField(max_length=256, blank=True, null=True)
+address_line_3 = models.CharField(max_length=256, blank=True, null=True)
+address_country = models.ForeignKey(‘cities_light.Country’, blank=True, null=True)  # &#64;TODO: remove blank, null
+address_lat = models.DecimalField(max_digits=22, decimal_places=18, null=True, blank=True)
+address_lng = models.DecimalField(max_digits=22, decimal_places=18, null=True, blank=True)
+incoming_modes = models.ManyToManyField(Modes, related_name=’outgoing_hub’)
+outgoing_modes = models.ManyToManyField(Modes, related_name=’incoming_hub’)
+stakeholder = models.ForeignKey(Stakeholder, blank=True, null=True)
+dynamic_table = models.ForeignKey(‘cp_eav.DynamicTable’, blank=True, null=True)
+address_state = models.CharField(max_length=256, blank=True, null=True)
+address_zipcode = models.CharField(max_length=10, blank=True, null=True)
+code = models.CharField(max_length=8, blank=True, null=True)
+linescape_id = models.IntegerField(blank=True, null=True)
+sharp_id = models.IntegerField(blank=True, null=True)
+alternative_names = models.CharField(blank=True, default=”“, max_length=2048)
+geo_id = models.CharField(max_length=30, blank=True, null=True)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return “{}”.format(self.name.encode(‘utf8’, ‘ignore’))</dd>
+</dl>
+<p>&#64;staticmethod
+def get_fields_list():</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>return [</dt>
+<dd>‘id’,
+‘name’
+‘is_cha’,
+‘holding_charge’,
+‘is_charge_unit_time’,
+‘address_line_1’,
+‘incoming_modes’,
+‘outgoing_modes’,
+‘stakeholder’,
+‘dynamic_table’
+‘address_state’,
+‘address_zipcode’</dd>
+</dl>
+<p>]</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def get_eav_values(self):</dt>
+<dd>return self.eav.get_values_dict()</dd>
+<dt>def get_lat_lng(self):</dt>
+<dd>lat_lng = (self.address_lat, self.address_lng)
+return lat_lng</dd>
+<dt>def get_gst(self):</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd>return self.subusers.gst</dd>
+<dt>except:</dt>
+<dd>return None</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>eav.register(Hubs)</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="h-view.html"
+                        title="previous chapter">hubs.views</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="h-serializer.html"
+                        title="next chapter">hubs.serializers</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/h-model.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="h-serializer.html" title="hubs.serializers"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="h-view.html" title="hubs.views"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,524 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>stakeholder.serializers &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="assets.views" href="a-view.html" />
+    <link rel="prev" title="stakeholder.models" href="model.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="a-view.html" title="assets.views"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="model.html" title="stakeholder.models"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="stakeholder-serializers">
+<h1>stakeholder.serializers<a class="headerlink" href="#stakeholder-serializers" title="Permalink to this headline">¶</a></h1>
+<p>from django.contrib.contenttypes.models import ContentType
+from rest_framework import serializers</p>
+<p>from cp_eav.models import DynamicTable
+from cp_yodlee.models import CPYodlee
+from payments.models import AdvanceOptions
+from stakeholder.models import Stakeholder, GuestStakeholder, BusinessEntity, StakeholderInfo
+from stakeholder.tasks import register_stakeholder
+from users.models import CamelportUser
+from users.serializers import CamelportUserSerializer</p>
+<dl class="docutils">
+<dt>class StakeholderRegisterSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">user = CamelportUserSerializer()
+password1 = serializers.CharField(max_length=32, write_only=True)
+password2 = serializers.CharField(max_length=32, write_only=True)</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (‘id’,</p>
+<blockquote>
+<div>‘user’,
+‘executive_first_name’,
+‘executive_last_name’,
+‘phone’,
+‘mobile’,
+‘password1’,
+‘password2’,
+‘dynamic_table’,
+‘company_name’,
+‘entity_type’,
+‘pan_number’,
+‘iec_code’,
+‘company_address_line_1’,
+‘company_address_line_2’,
+‘company_address_line_3’,
+‘city’,
+‘state’,
+‘country’,
+‘zipcode’,
+‘designation’,
+‘reg_status’,
+)</div></blockquote>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘dynamic_table’: {</dt>
+<dd>‘write_only’: True</dd>
+</dl>
+<p>},
+‘reg_status’: {</p>
+<blockquote>
+<div>‘write_only’: True</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>def validate_password1(self, value):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if value != self.initial_data[‘password2’]:</dt>
+<dd>raise serializers.ValidationError(“The passwords do not match”)</dd>
+</dl>
+<p>return value</p>
+</div></blockquote>
+<p>def create(self, validated_data):</p>
+<blockquote class="last">
+<div><p>user_data = validated_data.pop(‘user’)
+user = CamelportUser.objects.create(<a href="#id1"><span class="problematic" id="id2">**</span></a>user_data)
+password = validated_data.pop(‘password1’)
+validated_data.pop(‘password2’)
+user.change_password(password)</p>
+<dl class="docutils">
+<dt>if ‘dynamic_table’ not in validated_data:</dt>
+<dd><dl class="first docutils">
+<dt>validated_data[‘dynamic_table’], created = DynamicTable.objects.get_or_create(</dt>
+<dd>table_name=’Shipper’,
+content_type=ContentType.objects.get(model=’stakeholder’)</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>stakeholder = Stakeholder.objects.create(user=user, <a href="#id3"><span class="problematic" id="id4">**</span></a>validated_data)
+stakeholder = register_stakeholder(</p>
+<blockquote>
+<div>stk_id=stakeholder.id</div></blockquote>
+<p>)</p>
+<dl class="docutils">
+<dt>AdvanceOptions.objects.create(stakeholder=stakeholder,</dt>
+<dd>percent=50,
+additive=0)</dd>
+</dl>
+<p>CPYodlee.objects.create(stakeholder=stakeholder)
+# curl
+# <a class="reference external" href="https://camelportsupport.zendesk.com/api/v2/users.json">https://camelportsupport.zendesk.com/api/v2/users.json</a></p>
+<p>#######create_helpscout_account(stk_id=stakeholder.id)
+return stakeholder</p>
+</div></blockquote>
+</dd>
+<dt>class StakeholderRegStatusSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (‘reg_status’,</p>
+<blockquote class="last">
+<div>‘is_enabled’
+)</div></blockquote>
+</dd>
+</dl>
+</dd>
+<dt>class ChildStakeholderSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">user = CamelportUserSerializer()</p>
+<p>password1 = serializers.CharField(max_length=32, write_only=True)
+password2 = serializers.CharField(max_length=32, write_only=True)
+role = serializers.IntegerField(write_only=True)</p>
+<dl class="docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (</p>
+<blockquote>
+<div>‘executive_first_name’,
+‘executive_last_name’,
+‘user’,
+‘password1’,
+‘password2’,
+‘role’,
+‘is_enabled’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>def validate(self, attrs):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if attrs[‘password1’] != attrs[‘password2’]:</dt>
+<dd>raise serializers.ValidationError({‘password2’: “The passwords do not match”})</dd>
+</dl>
+<p>return attrs</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def validate_role(self, value):</dt>
+<dd><dl class="first docutils">
+<dt>if value &lt; 1 or value &gt; 4:</dt>
+<dd>raise serializers.ValidationError(‘Role must be between 1 and 4 (included)’)</dd>
+</dl>
+<p class="last">return value</p>
+</dd>
+</dl>
+</dd>
+<dt>class GuestStakeholderSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">child_stakeholder = ChildStakeholderSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd>model = GuestStakeholder
+fields = (‘id’, ‘child_stakeholder’)</dd>
+<dt>def create(self, validated_data):</dt>
+<dd><p class="first">child_stakeholder_data = validated_data.pop(‘child_stakeholder’)</p>
+<p>parent_stakeholder_instance = self.context[‘logged_in_stakeholder’]</p>
+<p>role = child_stakeholder_data.pop(‘role’)</p>
+<p>dynamic_table = DynamicTable.objects.get(table_name=’Guest{}’.format(role))</p>
+<p>child_stakeholder_data[‘dynamic_table’] = dynamic_table
+child_stakeholder_data[‘user’] = CamelportUser.objects.create(<a href="#id5"><span class="problematic" id="id6">**</span></a>child_stakeholder_data[‘user’])</p>
+<p>child_stakeholder_data[‘user’].change_password(child_stakeholder_data.pop(‘password1’))
+child_stakeholder_data.pop(‘password2’)</p>
+<p>child_stakeholder_data[‘company_name’] = parent_stakeholder_instance.company_name
+child_stakeholder_data[‘iec_code’] = parent_stakeholder_instance.iec_code
+child_stakeholder_data[‘company_address_line_1’] = parent_stakeholder_instance.company_address_line_1
+child_stakeholder_data[‘company_address_line_2’] = parent_stakeholder_instance.company_address_line_2
+child_stakeholder_data[‘company_address_line_3’] = parent_stakeholder_instance.company_address_line_3
+child_stakeholder_data[‘city’] = parent_stakeholder_instance.city
+child_stakeholder_data[‘state’] = parent_stakeholder_instance.state
+child_stakeholder_data[‘country’] = parent_stakeholder_instance.country
+child_stakeholder_data[‘zipcode’] = parent_stakeholder_instance.zipcode
+child_stakeholder_data[‘reg_status’] = parent_stakeholder_instance.reg_status</p>
+<p>child_stakeholder = Stakeholder.objects.create(<a href="#id7"><span class="problematic" id="id8">**</span></a>child_stakeholder_data)</p>
+<dl class="docutils">
+<dt>guest_obj = GuestStakeholder.objects.create(</dt>
+<dd>parent_stakeholder=parent_stakeholder_instance,
+child_stakeholder=child_stakeholder</dd>
+</dl>
+<p>)</p>
+<p class="last">return guest_obj</p>
+</dd>
+</dl>
+</dd>
+<dt>class StakeholderUpdateSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (‘id’,</p>
+<blockquote class="last">
+<div><p>‘executive_first_name’,
+‘executive_last_name’,
+‘phone’,
+‘mobile’,</p>
+<p>‘dynamic_table’,
+‘company_name’,
+‘entity_type’,
+‘pan_number’,
+‘iec_code’,
+‘company_address_line_1’,
+‘company_address_line_2’,
+‘company_address_line_3’,
+‘city’,
+‘state’,
+‘country’,
+‘zipcode’,
+‘designation’,
+‘reg_status’,
+‘is_enabled’
+)</p>
+</div></blockquote>
+</dd>
+<dt>def update(self, instance, validated_data):</dt>
+<dd><dl class="first docutils">
+<dt>for key in validated_data:</dt>
+<dd>setattr(instance, key, validated_data[key])</dd>
+</dl>
+<p class="last">instance.save()
+return instance</p>
+</dd>
+</dl>
+</dd>
+<dt>class BusinessEntitySerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = BusinessEntity
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘corporate_identification_number’,
+‘date_of_registration’,
+‘company_name’,
+‘company_status’,
+‘company_class’,
+‘company_category’,
+‘authorized_capital’,
+‘paidup_capital’,
+‘registered_state’,
+‘registrar_of_companies’,
+‘principal_business_activity_as_per_cin’,
+‘registered_office_address’,
+‘sub_category’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class ChildStakeholderListSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">user = CamelportUserSerializer()</p>
+<p>password1 = serializers.CharField(max_length=32, write_only=True)
+password2 = serializers.CharField(max_length=32, write_only=True)
+role = serializers.IntegerField(write_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘executive_first_name’,
+‘executive_last_name’,
+‘user’,
+‘password1’,
+‘password2’,
+‘role’,
+‘is_enabled’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class StakeholderFullSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">user = CamelportUserSerializer()</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (‘id’,</p>
+<blockquote>
+<div>‘user’,
+‘executive_first_name’,
+‘executive_last_name’,
+‘phone’,
+‘mobile’,
+‘dynamic_table’,
+‘company_name’,
+‘entity_type’,
+‘pan_number’,
+‘iec_code’,
+‘company_address_line_1’,
+‘company_address_line_2’,
+‘company_address_line_3’,
+‘city’,
+‘state’,
+‘country’,
+‘zipcode’,
+‘designation’,
+‘reg_status’,
+‘quickbooks_customer’,
+‘razor_pay’,
+‘helpscout_id’,
+‘is_enabled’
+)</div></blockquote>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘executive_first_name’: {</dt>
+<dd>‘required’: False</dd>
+</dl>
+<p>},
+‘executive_last_name’: {</p>
+<blockquote>
+<div>‘required’: False</div></blockquote>
+<dl class="docutils">
+<dt>}, ‘phone’: {</dt>
+<dd>‘required’: False</dd>
+<dt>}, ‘mobile’: {</dt>
+<dd>‘required’: False</dd>
+<dt>}, ‘dynamic_table’: {</dt>
+<dd>‘required’: False</dd>
+<dt>}, ‘user’: {</dt>
+<dd>‘required’: False</dd>
+</dl>
+<p class="last">},</p>
+</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+</dd>
+<dt>class StakeholderShortSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">user = CamelportUserSerializer()
+stakeholder_type = serializers.SerializerMethodField(read_only=True)
+class Meta:</p>
+<blockquote>
+<div><p>model = Stakeholder
+fields = (‘id’,</p>
+<blockquote>
+<div>‘user’,
+‘executive_first_name’,
+‘executive_last_name’,
+‘company_name’,
+‘is_enabled’,
+‘stakeholder_type’
+)</div></blockquote>
+<dl class="docutils">
+<dt>extra_kwargs = {</dt>
+<dd><dl class="first docutils">
+<dt>‘executive_first_name’: {</dt>
+<dd>‘required’: False</dd>
+</dl>
+<p>},
+‘executive_last_name’: {</p>
+<blockquote>
+<div>‘required’: False</div></blockquote>
+<dl class="docutils">
+<dt>}, ‘user’: {</dt>
+<dd>‘required’: False</dd>
+</dl>
+<p class="last">},</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def get_stakeholder_type(self, instance):</dt>
+<dd>return instance.user.stakeholder.dynamic_table.table_name</dd>
+</dl>
+</dd>
+<dt>class StakeholderChangePasswordSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">password1 = serializers.CharField(max_length=32, write_only=True)
+password2 = serializers.CharField(max_length=32, write_only=True)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (</p>
+<blockquote>
+<div>‘password1’,
+‘password2’</div></blockquote>
+<p class="last">)</p>
+</dd>
+<dt>def validate_password1(self, value):</dt>
+<dd><dl class="first docutils">
+<dt>if value != self.initial_data[‘password2’]:</dt>
+<dd>raise serializers.ValidationError(“The passwords do not match”)</dd>
+</dl>
+<p class="last">return value</p>
+</dd>
+</dl>
+</dd>
+<dt>class StakeholderInfoSerializer(serializers.ModelSerializer):</dt>
+<dd><dl class="first last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = StakeholderInfo
+fields = (</p>
+<blockquote>
+<div>‘stakeholder’,
+‘rating’,
+‘age_of_company_years’,
+‘house_bl’,
+‘response_time_hr’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class StakeholderDetailSerializer(serializers.ModelSerializer):</dt>
+<dd><p class="first">user = CamelportUserSerializer()
+info = StakeholderInfoSerializer(source=’get_stakeholder_info’)</p>
+<dl class="last docutils">
+<dt>class Meta:</dt>
+<dd><p class="first">model = Stakeholder
+fields = (</p>
+<blockquote>
+<div>‘id’,
+‘executive_first_name’,
+‘executive_last_name’,
+‘company_name’,
+‘user’,
+‘is_enabled’,
+‘info’</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="model.html"
+                        title="previous chapter">stakeholder.models</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="a-view.html"
+                        title="next chapter">assets.views</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/serializer.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="a-view.html" title="assets.views"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="model.html" title="stakeholder.models"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

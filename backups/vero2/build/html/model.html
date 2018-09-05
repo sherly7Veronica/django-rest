@@ -1,0 +1,364 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>stakeholder.models &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="stakeholder.serializers" href="serializer.html" />
+    <link rel="prev" title="stakeholder.views" href="view.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="serializer.html" title="stakeholder.serializers"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="view.html" title="stakeholder.views"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="stakeholder-models">
+<h1>stakeholder.models<a class="headerlink" href="#stakeholder-models" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>import string</p>
+<p>from django.conf import settings
+from django.db import models</p>
+<p>from users.models import CamelportUser
+from utils.helpers import random_string
+from utils.models import DateBaseModel</p>
+<p>ENTITY_PRIVATE_LIMITED = 0
+ENTITY_PUBLIC_LIMITED = 1
+ENTITY_PARTNERSHIP = 2
+ENTITY_PROPRIETORSHIP = 3
+ENTITY_LIMITED_LIABILITY_PARTNERSHIP = 4
+ENTITY_ONE_PERSON_COMPANY = 5</p>
+<dl class="docutils">
+<dt>ENTITY_CHOICES = (</dt>
+<dd>(ENTITY_PRIVATE_LIMITED, ‘pvtltd’),
+(ENTITY_PUBLIC_LIMITED, ‘publtd’),
+(ENTITY_PARTNERSHIP, ‘partnership’),
+(ENTITY_PROPRIETORSHIP, ‘proprietorship’),
+(ENTITY_LIMITED_LIABILITY_PARTNERSHIP, ‘limited__liability_lpartnership’),
+(ENTITY_ONE_PERSON_COMPANY, ‘one_person_company’)</dd>
+</dl>
+<p>)</p>
+<p>DESIGNATION_DIRECTOR = 0
+DESIGNATION_PROPRIETOR = 1
+DESIGNATION_PARTNER = 2
+DESIGNATION_DESIGNATED_PARTNER = 3
+DESIGNATION_OTHER = 4</p>
+<dl class="docutils">
+<dt>DESIGNATION_CHOICES = (</dt>
+<dd>(DESIGNATION_DIRECTOR, ‘director’),
+(DESIGNATION_PROPRIETOR, ‘proprietor’),
+(DESIGNATION_PARTNER, ‘partner’),
+(DESIGNATION_DESIGNATED_PARTNER, ‘designated_Partner’),
+(DESIGNATION_OTHER, ‘other’)</dd>
+</dl>
+<p>)</p>
+<p>ROLE_ADMIN = 0
+ROLE_OPERATIONS = 1
+ROLE_COMMERCIAL = 2
+ROLE_ACCOUNTANT = 3</p>
+<dl class="docutils">
+<dt>ROLE_CHOICES = (</dt>
+<dd>(ROLE_ADMIN, ‘admin’),
+(ROLE_OPERATIONS, ‘operations’),
+(ROLE_COMMERCIAL, ‘commercial’),
+(ROLE_ACCOUNTANT, ‘accountant’)</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>def doc_upload_file_location(instance, filename):</dt>
+<dd>return ‘stakeholder_docs/{}/{}’.format(str(instance.id), filename)</dd>
+<dt>class Stakeholder(DateBaseModel):</dt>
+<dd><p class="first">“””
+A Stakeholder is any user (typically an organisation) who plays some role in the
+process
+Stake holder will be the base class for all things related to user
+“””
+UNVERIFIED_PLAN = 0
+STARTUP_PLAN = 1
+BUSINESS_PLAN = 2
+ENTERPRISE_PLAN = 3
+PLAN_CHOICES = (</p>
+<blockquote>
+<div>(UNVERIFIED_PLAN, ‘unverified’),
+(STARTUP_PLAN, ‘startup’),
+(BUSINESS_PLAN, ‘business’),
+(ENTERPRISE_PLAN, ‘enterprise’)</div></blockquote>
+<p>)
+user = models.OneToOneField(CamelportUser)
+executive_first_name = models.CharField(max_length=32)
+executive_last_name = models.CharField(max_length=32, blank=True, null=True)
+phone = models.CharField(max_length=20, blank=True, null=True)  # &#64;TODO: validator
+mobile = models.CharField(max_length=20, blank=True, null=True)  # &#64;TODO: validator
+email_verified = models.BooleanField(default=False)
+mobile_verified = models.BooleanField(default=False)
+zendesk_id = models.BigIntegerField(blank=True, null=True)
+razor_pay = models.CharField(max_length=30, blank=True, null=True)
+dynamic_table = models.ForeignKey(‘cp_eav.DynamicTable’, blank=True, null=True)
+quickbooks_customer = models.CharField(max_length=30, blank=True, null=True)
+whatsapp_number = models.CharField(max_length=16, blank=True, null=True)
+helpscout_id = models.IntegerField(blank=True, null=True)</p>
+<p>company_name = models.CharField(max_length=256, null=True, blank=True)
+entity_type = models.IntegerField(choices=ENTITY_CHOICES, null=True, blank=True)
+pan_number = models.CharField(max_length=20, null=True, blank=True)
+iec_code = models.CharField(max_length=256, null=True, blank=True)
+company_address_line_1 = models.TextField(null=True, blank=True)
+company_address_line_2 = models.TextField(null=True, blank=True)
+company_address_line_3 = models.TextField(null=True, blank=True)
+city = models.CharField(max_length=256, null=True, blank=True)
+state = models.CharField(max_length=256, null=True, blank=True)
+country = models.CharField(max_length=256, null=True, blank=True)
+zipcode = models.IntegerField(max_length=20, null=True, blank=True)
+designation = models.IntegerField(choices=DESIGNATION_CHOICES, null=True, blank=True)
+authorization_docs = models.FileField(blank=True, null=True, upload_to=doc_upload_file_location)
+reg_status = models.IntegerField(default=0)
+is_enabled = models.BooleanField(default=False)
+razor_account_number = models.CharField(max_length=20, null=True, blank=True)
+razor_ifsc_code = models.CharField(max_length=15, null=True, blank=True)
+pricing_plan = models.IntegerField(choices=PLAN_CHOICES, default=UNVERIFIED_PLAN)</p>
+<p>def __str__(self):</p>
+<blockquote>
+<div><p>l_name = ‘’
+if self.executive_last_name:</p>
+<blockquote>
+<div>l_name = self.executive_last_name.encode(‘utf8’, ‘ignore’)</div></blockquote>
+<p>f_name = ‘’
+if self.executive_first_name:</p>
+<blockquote>
+<div>f_name = self.executive_first_name.encode(‘utf8’, ‘ignore’)</div></blockquote>
+<dl class="docutils">
+<dt>return “{} {}”.format(l_name,</dt>
+<dd>f_name)</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>def get_complete_stakeholder_address(self):</dt>
+<dd><dl class="first docutils">
+<dt>complete_address = “{}, {}, {}”.format(self.company_address_line_1, self.company_address_line_2,</dt>
+<dd>self.company_address_line_3)</dd>
+</dl>
+<p class="last">return complete_address</p>
+</dd>
+</dl>
+<p>&#64;staticmethod
+def get_fields_list():</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>return [</dt>
+<dd>‘id’,
+‘user’,
+‘executive_first_name’,
+‘executive_last_name’,
+‘phone’,
+‘mobile’,
+‘email_verified’,
+‘mobile_verified’,
+‘zendesk_id’,
+‘razor_pay’,
+‘dynamic_table’</dd>
+</dl>
+<p>]</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def get_eav_values(self):</dt>
+<dd>return self.eav.get_values_dict()</dd>
+<dt>def get_stakeholder_type(self):</dt>
+<dd><p class="first">return self.dynamic_table.table_name</p>
+<p class="last"># def __init__(self, <a href="#id1"><span class="problematic" id="id2">*</span></a>args, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs):
+#     kwargs[‘razor_pay’] = create_virtual_account({‘name’: ‘{}’.format(self.user.name),
+#                                                   ‘email’:’{}’.format(self.user.email),
+#                                                   ‘contact’: ‘{}’.format(self.mobile)})
+#     super(Stakeholder, self).__init__(<a href="#id5"><span class="problematic" id="id6">*</span></a>args, <a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs)</p>
+</dd>
+<dt>def is_customer(self):</dt>
+<dd>return settings.STAKEHOLDER_TYPE[self.get_stakeholder_type()] == settings.STAKEHOLDER_TYPE_CUSTOMER</dd>
+<dt>def get_stakeholder_info(self):</dt>
+<dd>return self.stakeholderinfo</dd>
+</dl>
+</dd>
+<dt>class GuestStakeholder(DateBaseModel):</dt>
+<dd><dl class="first docutils">
+<dt>parent_stakeholder = models.ForeignKey(‘stakeholder.Stakeholder’, blank=True, null=True,</dt>
+<dd>related_name=’guest_parent_stakeholder’)</dd>
+<dt>child_stakeholder = models.OneToOneField(‘stakeholder.Stakeholder’, blank=True, null=True,</dt>
+<dd>related_name=’guest_child_stakeholder’)</dd>
+</dl>
+<p>name = models.CharField(max_length=120)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd><dl class="first docutils">
+<dt>if self.name:</dt>
+<dd>return str(self.name.encode(‘utf8’, ‘ignore’))</dd>
+<dt>else:</dt>
+<dd>return “”</dd>
+</dl>
+<p class="last"># def __str__(self):
+#     return self.user.name.encode(‘utf8’, ‘ignore’)</p>
+</dd>
+</dl>
+</dd>
+<dt>class BusinessEntity(DateBaseModel):</dt>
+<dd><p class="first">corporate_identification_number = models.CharField(max_length=50)
+date_of_registration = models.DateField(blank=True, null=True)
+company_name = models.CharField(max_length=200)
+company_status = models.CharField(max_length=100, blank=True, null=True)
+company_class = models.CharField(max_length=50, blank=True, null=True)
+company_category = models.CharField(max_length=100, blank=True, null=True)
+authorized_capital = models.DecimalField(max_digits=16, decimal_places=2, blank=True, null=True)
+paidup_capital = models.DecimalField(max_digits=16, decimal_places=2, blank=True, null=True)
+registered_state = models.CharField(max_length=50, blank=True, null=True)
+registrar_of_companies = models.CharField(max_length=200, blank=True, null=True)
+principal_business_activity_as_per_cin = models.CharField(max_length=200, blank=True, null=True)
+registered_office_address = models.CharField(max_length=200, blank=True, null=True)
+sub_category = models.CharField(max_length=200, blank=True, null=True)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd><dl class="first last docutils">
+<dt>if self.company_name:</dt>
+<dd>return self.company_name.encode(‘utf8’, ‘ignore’)</dd>
+<dt>else:</dt>
+<dd>return “”</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+<p># eav.register(StakeholderCategory)</p>
+<p># class LegalEntity(models.Model, DateMixin):
+#     “””
+#     A Legal entity is a branch or factory or entity to which invoices are raised against
+#     A stakeholder may have multiple Legal entities register under him
+#     “””
+#     stakeholder = models.ForeignKey(Stakeholder)
+#     name = models.CharField(max_length=128, verbose_name=’Legal Entity Name’)</p>
+<dl class="docutils">
+<dt>class StakeholderInfo(DateBaseModel):</dt>
+<dd><p class="first">stakeholder = models.OneToOneField(‘stakeholder.Stakeholder’)
+rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+age_of_company_years = models.IntegerField(blank=True, null=True)
+house_bl = models.BooleanField(default=False)
+response_time_hr = models.DecimalField(max_digits=7, decimal_places=2, blank=True, null=True)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.stakeholder.user.email)</dd>
+</dl>
+</dd>
+<dt>def get_session_id():</dt>
+<dd><dl class="first docutils">
+<dt>session_id = random_string(size=128,</dt>
+<dd>chars=string.ascii_uppercase + string.ascii_lowercase + string.digits + string.punctuation)</dd>
+</dl>
+<p class="last">return session_id</p>
+</dd>
+<dt>def get_secret_key():</dt>
+<dd><dl class="first docutils">
+<dt>secret_key = random_string(size=16,</dt>
+<dd>chars=string.ascii_uppercase + string.ascii_lowercase + string.digits + string.punctuation)</dd>
+</dl>
+<p class="last">return secret_key</p>
+</dd>
+<dt>class Session(DateBaseModel):</dt>
+<dd><p class="first">stakeholder = models.ForeignKey(‘stakeholder.Stakeholder’)
+expires_on = models.DateTimeField()
+access_timestamp = models.IntegerField(default=0)
+public_key = models.CharField(max_length=128)
+remote_ip = models.CharField(max_length=64)
+session_id = models.CharField(max_length=128, default=get_session_id)
+secret_key = models.CharField(max_length=16, default=get_secret_key)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return str(self.stakeholder.user.email)</dd>
+</dl>
+</dd>
+<dt>def generate_email_token():</dt>
+<dd>return random_string(size=128)</dd>
+<dt>class EmailVerifyToken(DateBaseModel):</dt>
+<dd>stakeholder = models.ForeignKey(‘stakeholder.Stakeholder’)
+token = models.CharField(max_length=128, default=generate_email_token)</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="view.html"
+                        title="previous chapter">stakeholder.views</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="serializer.html"
+                        title="next chapter">stakeholder.serializers</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/model.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="serializer.html" title="stakeholder.serializers"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="view.html" title="stakeholder.views"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

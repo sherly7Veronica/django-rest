@@ -1,0 +1,931 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>task.views &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="task.models" href="t-model.html" />
+    <link rel="prev" title="rates.serializer" href="r-serializer.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="t-model.html" title="task.models"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="r-serializer.html" title="rates.serializer"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="task-views">
+<h1>task.views<a class="headerlink" href="#task-views" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>from django.conf import settings
+from django.db import connection
+from django.db.models import Q
+from django.http.response import Http404
+from rest_framework import generics, status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView</p>
+<p>from booking.models import Booking
+from shipment.models import ShipmentBooking, Shipment
+from task import serializer
+from task.models import Task, AbstractTask, FormElement, Form, FormElementValue, TaskVariable
+from task.serializer import TaskSerializer, AbstractTaskSerializer, FormElementsSerializer, FormSerializer, </p>
+<blockquote>
+<div>TaskDataSerializer, TaskVariableSerializerModel, FormRetrieveSerializer, AbstractTaskWithPenaltiesSerializer, TaskGantChartSerializer</div></blockquote>
+<p>from utils.metadata import CPMeta
+from utils.pagination import CamelportPagination</p>
+<dl class="docutils">
+<dt>class AbstractTaskWithPenaltiesListCreateAPIView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">serializer_class = AbstractTaskWithPenaltiesSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return AbstractTask.objects.all()</dd>
+</dl>
+</dd>
+<dt>class TasksForBookingListView(generics.ListAPIView):</dt>
+<dd><p class="first">serializer_class = TaskSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return Task.objects.filter(</dt>
+<dd>booking_id=self.kwargs[‘booking_id’]</dd>
+</dl>
+<p class="last">).order_by(‘created_at’)</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskLCAPIView(generics.CreateAPIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def __init__(self, <a href="#id1"><span class="problematic" id="id2">**</span></a>kwargs):</dt>
+<dd>super(TaskLCAPIView, self).__init__(<a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs)
+self.cache_task = None</dd>
+<dt>def get_serializer_class(self):</dt>
+<dd><dl class="first last docutils">
+<dt>if self.cache_task is None:</dt>
+<dd>self.cache_task = Task.objects.get(pk=self.kwargs[‘task_id’])</dd>
+<dt>if self.cache_task.task_type is Task.TASK_TYPE_ACKNOWLEDGEMENT:</dt>
+<dd>return serializer.AcknowledgementSerializer</dd>
+<dt>elif self.cache_task.task_type is Task.TASK_TYPE_ACK:</dt>
+<dd>return serializer.TaskDataLCSerializer</dd>
+<dt>elif self.cache_task.task_type is Task.TASK_TYPE_FILE_UPLOAD:</dt>
+<dd>return serializer.TaskFileUploadSerializer</dd>
+<dt>elif self.cache_task.task_type is Task.TASK_TYPE_DOWNLOAD:</dt>
+<dd>return serializer.TaskFileDownloadSerializer</dd>
+</dl>
+</dd>
+<dt>def get_serializer_context(self):</dt>
+<dd><p class="first">context = super(TaskLCAPIView, self).get_serializer_context()
+if self.cache_task is None:</p>
+<blockquote>
+<div>self.cache_task = Task.objects.get(pk=self.kwargs[‘task_id’])</div></blockquote>
+<p class="last">context[‘task’] = self.cache_task
+return context</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskCompletedApiView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta
+serializer_class = TaskSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return Task.objects.filter(</dt>
+<dd><dl class="first docutils">
+<dt>(</dt>
+<dd>Q(task_for=self.request.user.stakeholder) |
+Q(secondary_stakeholders=self.request.user.stakeholder)</dd>
+</dl>
+<p class="last">) &amp;
+Q(completed_at__isnull=False)</p>
+</dd>
+</dl>
+<p class="last">).order_by(‘created_at’)</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskListCreateAPIView(generics.ListCreateAPIView):</dt>
+<dd><dl class="first docutils">
+<dt>“”“get: Return a list of all the existing Task.,</dt>
+<dd>post:Create new task”“”</dd>
+</dl>
+<p>pagination_class = CamelportPagination
+metadata_class = CPMeta
+serializer_class = TaskSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return Task.objects.filter(</dt>
+<dd><dl class="first docutils">
+<dt>(</dt>
+<dd>Q(task_for=self.request.user.stakeholder) |
+Q(secondary_stakeholders=self.request.user.stakeholder)</dd>
+</dl>
+<p class="last">) &amp;
+Q(completed_at__isnull=True)</p>
+</dd>
+</dl>
+<p class="last">).order_by(‘created_at’)</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">serializer_class = TaskSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Task.objects.all()</dd>
+</dl>
+</dd>
+<dt>class ActiveApiView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta
+serializer_class = TaskSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><p class="first">query = “””
+SELECT</p>
+<blockquote>
+<div><ul class="simple">
+<li>,</li>
+</ul>
+<p>add_minutes(“task_task”.”triggered_at”, “task_task”.”expiry”) AS “escalation_timestamp”</p>
+</div></blockquote>
+<p>FROM “task_task”
+LEFT OUTER JOIN</p>
+<blockquote>
+<div>“task_task_secondary_stakeholders” ON (“task_task”.”id” = “task_task_secondary_stakeholders”.”task_id”)</div></blockquote>
+<dl class="docutils">
+<dt>WHERE</dt>
+<dd><dl class="first docutils">
+<dt>(</dt>
+<dd><dl class="first docutils">
+<dt>(</dt>
+<dd>“task_task”.”task_for_id” = ‘{stakeholder_id}’ OR
+“task_task_secondary_stakeholders”.”stakeholder_id” = ‘{stakeholder_id}’</dd>
+</dl>
+<p class="last">) AND
+“task_task”.”completed_at” IS NULL AND
+“task_task”.”triggered_at” IS NOT NULL AND
+“task_task”.”expired_at” IS NULL</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">ORDER BY “escalation_timestamp” ASC
+“”“.format(stakeholder_id=self.request.user.stakeholder.id)
+return list(Task.objects.raw(str(query)))</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<blockquote>
+<div><p>metadata_class = CPMeta
+serializer_class = TaskGantChartSerializer</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd>cpbooking = self.kwargs[‘cpbooking_id’]
+tasks = Task.objects.filter(booking_id=cpbooking).order_by(‘order_number’).distinct()
+return tasks</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>class AllTaskBookingApiView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta
+serializer_class = TaskGantChartSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>booking = Booking.objects.get(id=self.kwargs[‘booking_id’])
+cpbooking = booking.quote.cpbooking
+tasks = Task.objects.filter(booking=cpbooking).order_by(‘order_number’).distinct()
+return tasks</dd>
+</dl>
+</dd>
+</dl>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class AbstractTaskListCreateAPIView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta
+serializer_class = AbstractTaskSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return AbstractTask.objects.all()</dd>
+</dl>
+</dd>
+</dl>
+<p># class AbstractTaskWithFormLCAPIView(generics.CreateAPIView):
+#     def __init__(self, <a href="#id5"><span class="problematic" id="id6">**</span></a>kwargs):
+#         super(AbstractTaskWithFormLCAPIView, self).__init__(<a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs)
+#         self.cache_task = None
+#
+#     def get_serializer_class(self):
+#         if self.cache_task is None:
+#             self.cache_task = Task.objects.get(pk=self.kwargs[‘task_id’])
+#         if self.cache_task.task_type is Task.TASK_TYPE_ACKNOWLEDGEMENT:
+#             return serializer.AcknowledgementSerializer
+#         elif self.cache_task.task_type is Task.TASK_TYPE_DATA_INPUT:
+#             return serializer.TaskDataLCSerializer
+#         elif self.cache_task.task_type is Task.TASK_TYPE_FILE_UPLOAD:
+#             return serializer.TaskFileUploadSerializer
+#         elif self.cache_task.task_type is Task.TASK_TYPE_DOWNLOAD:
+#             return serializer.TaskFileDownloadSerializer
+#
+#     def get_serializer_context(self):
+#         context = super(TaskLCAPIView, self).get_serializer_context()
+#         if self.cache_task is None:
+#             self.cache_task = Task.objects.get(pk=self.kwargs[‘task_id’])
+#         context[‘task’] = self.cache_task
+#         return context</p>
+<dl class="docutils">
+<dt>class AbstractTaskRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">serializer_class = AbstractTaskSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return AbstractTask.objects.all()</dd>
+<dt>def get_serializer(self, <a href="#id9"><span class="problematic" id="id10">*</span></a>args, <a href="#id11"><span class="problematic" id="id12">**</span></a>kwargs):</dt>
+<dd>return super(AbstractTaskRetrieveUpdateDestroyAPIView, self).get_serializer(<a href="#id13"><span class="problematic" id="id14">*</span></a>args, <a href="#id15"><span class="problematic" id="id16">**</span></a>kwargs)</dd>
+</dl>
+</dd>
+<dt>class FormElementsLCView(generics.ListCreateAPIView):</dt>
+<dd>serializer_class = FormElementsSerializer
+queryset = FormElement.objects.all()</dd>
+<dt>class FormElementsRUDView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd>serializer_class = FormElementsSerializer
+queryset = FormElement.objects.all()</dd>
+<dt>class TaskDataOptionsRetreiveView(generics.RetrieveAPIView):</dt>
+<dd><dl class="first docutils">
+<dt>def __init__(self, <a href="#id17"><span class="problematic" id="id18">**</span></a>kwargs):</dt>
+<dd>super(TaskDataOptionsRetreiveView, self).__init__(<a href="#id19"><span class="problematic" id="id20">**</span></a>kwargs)
+self.task = None</dd>
+</dl>
+<p>permission_classes = [IsAuthenticated]</p>
+<dl class="docutils">
+<dt>def get_object(self):</dt>
+<dd>self.task = Task.objects.get(pk=self.kwargs[‘pk’])
+f_obj = self.task.form
+return f_obj</dd>
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>form_obj = Form.objects.filter(</dt>
+<dd>Q(task__task_for=self.request.user.stakeholder) |
+Q(task__secondary_stakeholders=self.request.user.stakeholder)</dd>
+</dl>
+<p class="last">)
+return form_obj</p>
+</dd>
+</dl>
+<p># def get_serializer(self, <a href="#id21"><span class="problematic" id="id22">*</span></a>args, <a href="#id23"><span class="problematic" id="id24">**</span></a>kwargs):
+#     return FormSerializer</p>
+<p># serializer_class = FormSerializer</p>
+<dl class="last docutils">
+<dt>def get_serializer_class(self):</dt>
+<dd>return FormSerializer</dd>
+<dt>def retrieve(self, request, <a href="#id25"><span class="problematic" id="id26">*</span></a>args, <a href="#id27"><span class="problematic" id="id28">**</span></a>kwargs):</dt>
+<dd><p class="first">instance = self.get_object()
+serializer = self.get_serializer(instance)
+result = serializer.data</p>
+<dl class="docutils">
+<dt>task_serializer = TaskVariableSerializerModel(</dt>
+<dd>var_names=[‘container_nums’],  # &lt;–
+cp_booking_id=self.task.booking_id,
+stakeholder=request.user.stakeholder</dd>
+</dl>
+<p>)</p>
+<p>vars = task_serializer.data()</p>
+<dl class="docutils">
+<dt>titles = vars.setdefault(</dt>
+<dd><p class="first">‘container_nums’,
+{</p>
+<blockquote>
+<div>‘values’: self.get_default_container_values()</div></blockquote>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>)</p>
+<p>result[‘shipment_details’] = self._get_is_filled(titles[‘values’])</p>
+<p>v = vars</p>
+<p class="last">return Response(result)</p>
+</dd>
+<dt>def get_default_container_values(self):</dt>
+<dd><p class="first">default_cont_values = []
+request_stakeholder = self.request.user.stakeholder
+# request_stakeholder = self.context[‘request’].user.stakeholder</p>
+<p>task_for_vendor = False
+if self.task.task_for == request_stakeholder:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if settings.STAKEHOLDER_TYPE[</dt>
+<dd><p class="first">request_stakeholder.dynamic_table.table_name] == settings.STAKEHOLDER_TYPE_VENDOR:
+task_vendor_booking = Booking.objects.get(service_provider=request_stakeholder,</p>
+<blockquote>
+<div>quote=self.task.booking.quote)</div></blockquote>
+<p>sb = ShipmentBooking.objects.filter(vendor_booking=task_vendor_booking)
+j = []
+for k in sb:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>j.append({</dt>
+<dd>‘i’: k.shipment.shipment_num,
+‘container_num’: k.shipment.container_num</dd>
+</dl>
+<p>})</p>
+</div></blockquote>
+<p class="last">task_vendor_booking_shipment_num_list = j
+task_for_vendor = True</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>if task_for_vendor:</dt>
+<dd><p class="first">container_num = 1
+for i in task_vendor_booking_shipment_num_list:</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>default_cont_values.append({</dt>
+<dd>‘shipment_num’: i[‘i’],
+‘value’: i[‘container_num’] or “Container #{}”.format(container_num)</dd>
+</dl>
+<p>})
+container_num += 1</p>
+</div></blockquote>
+</dd>
+</dl>
+<p>else:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>shipment_values = Shipment.objects.filter(shipper_quote=self.task.booking.quote).distinct().values_list(</dt>
+<dd>‘shipment_num’, ‘container_num’)</dd>
+</dl>
+<p>shipment_values = {x[0]: x[1] for x in shipment_values}</p>
+<dl class="docutils">
+<dt>for i in range(self.task.booking.quote.no_of_containers):</dt>
+<dd><dl class="first docutils">
+<dt>default_cont_values.append({</dt>
+<dd>‘shipment_num’: i + 1,
+‘value’: shipment_values[i + 1] or “Container #{}”.format(i + 1)</dd>
+</dl>
+<p class="last">})</p>
+</dd>
+</dl>
+</div></blockquote>
+<p># for i in range(self.task.booking.quote.no_of_containers):
+#     default_cont_values.append({
+#         ‘shipment_num’: i + 1,
+#         ‘value’: “Container #{}”.format(i + 1)
+#     })</p>
+<p class="last">return default_cont_values</p>
+</dd>
+<dt>def _get_is_filled(self, vars):</dt>
+<dd><p class="first"># for var in vars:
+#     var[‘is_filled’] = FormElementValue.objects.filter(
+#         shipment__shipment_num=var[‘shipment_num’],
+#         form_element__form=self.task.form,
+#         shipment__shipper_quote=self.task.booking.quote
+#     ).count() &gt; 0
+#
+#     var[‘title’] = var.pop(‘value’)</p>
+<p>form = self.task.form
+form_elements = form.get_elements()
+required_count = 0
+form_element_r_list = []
+for form_element in form_elements:</p>
+<blockquote>
+<div><p>required = form_element.get_kwarg(‘required’)
+if required:</p>
+<blockquote>
+<div>required_count += 1
+form_element_r_list.append(form_element)</div></blockquote>
+</div></blockquote>
+<dl class="docutils">
+<dt>for var in vars:</dt>
+<dd><dl class="first docutils">
+<dt>var[‘is_filled’] = FormElementValue.objects.filter(</dt>
+<dd>shipment__shipment_num=var[‘shipment_num’],
+# form_element__form=form,
+form_element__in=form_element_r_list,
+shipment__shipper_quote=self.task.booking.quote,
+task=self.task</dd>
+</dl>
+<p>).count() &gt;= required_count</p>
+<p>check_is_filled = var[‘is_filled’]</p>
+<p class="last">var[‘title’] = var.pop(‘value’)</p>
+</dd>
+</dl>
+<p class="last">return vars</p>
+</dd>
+</dl>
+</dd>
+<dt>class FormElementValueCView(generics.CreateAPIView):</dt>
+<dd><dl class="first docutils">
+<dt>def __init__(self, <a href="#id29"><span class="problematic" id="id30">**</span></a>kwargs):</dt>
+<dd>super(FormElementValueCView, self).__init__(<a href="#id31"><span class="problematic" id="id32">**</span></a>kwargs)
+self.task = None</dd>
+</dl>
+<p>serializer_class = TaskDataSerializer
+queryset = Task.objects.filter(</p>
+<blockquote>
+<div>form__isnull=False</div></blockquote>
+<p>)</p>
+<dl class="last docutils">
+<dt>def get_serializer(self, <a href="#id33"><span class="problematic" id="id34">*</span></a>args, <a href="#id35"><span class="problematic" id="id36">**</span></a>kwargs):</dt>
+<dd><p class="first">serializer_class = self.get_serializer_class()
+kwargs[‘context’] = self.get_serializer_context()
+if self.task:</p>
+<blockquote>
+<div>kwargs[‘task’] = self.task</div></blockquote>
+<dl class="docutils">
+<dt>else:</dt>
+<dd><dl class="first docutils">
+<dt>kwargs[‘task’] = self.task = self.get_queryset().get(</dt>
+<dd>pk=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">kwargs[‘shipment_num’] = self.kwargs[‘s_num’]
+kwargs[‘is_create’] = True
+return serializer_class(<a href="#id37"><span class="problematic" id="id38">*</span></a>args, <a href="#id39"><span class="problematic" id="id40">**</span></a>kwargs)</p>
+</dd>
+<dt>def create(self, request, <a href="#id41"><span class="problematic" id="id42">*</span></a>args, <a href="#id43"><span class="problematic" id="id44">**</span></a>kwargs):</dt>
+<dd><p class="first">serializer = self.get_serializer(data=request.data)
+serializer.is_valid(raise_exception=True)
+self.perform_create(serializer)
+headers = self.get_success_headers(serializer.data)</p>
+<p>result = serializer.data</p>
+<p>values = []</p>
+<dl class="docutils">
+<dt>for key, value in result.items():</dt>
+<dd><dl class="first last docutils">
+<dt>values.append({</dt>
+<dd>‘name’: key,
+‘label’: serializer.field_form_element[key].label,
+‘type’: serializer.field_form_element[key].get_type_display(),
+‘value’: value</dd>
+</dl>
+</dd>
+<dt>final_result = {</dt>
+<dd>‘is_completed’: not self.task.is_active,
+‘data’: values</dd>
+</dl>
+<p>}</p>
+<p class="last">return Response(final_result, status=status.HTTP_201_CREATED, headers=headers)</p>
+</dd>
+</dl>
+</dd>
+<dt>class FormElementValueRUDView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><dl class="first docutils">
+<dt>def __init__(self, <a href="#id45"><span class="problematic" id="id46">**</span></a>kwargs):</dt>
+<dd>super(FormElementValueRUDView, self).__init__(<a href="#id47"><span class="problematic" id="id48">**</span></a>kwargs)
+self.task = None</dd>
+</dl>
+<p>serializer_class = TaskDataSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>t = Task.objects.filter(</dt>
+<dd>form__isnull=False,
+triggered_at__isnull=False</dd>
+<dt>).filter(</dt>
+<dd><dl class="first docutils">
+<dt>Q(</dt>
+<dd>notify_stakeholders=self.request.user.stakeholder</dd>
+</dl>
+<p>) |
+Q(</p>
+<blockquote>
+<div>task_for=self.request.user.stakeholder</div></blockquote>
+<p>) |
+Q(</p>
+<blockquote>
+<div>secondary_stakeholders=self.request.user.stakeholder</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)
+return t</p>
+</dd>
+<dt>def get_object(self):</dt>
+<dd><p class="first">self.task = self.get_queryset().distinct().get(pk=self.kwargs[‘pk’])
+result = self.task.get_form_data_instance(self.kwargs[‘s_num’])
+if len(result.form_elements_values) == 0:</p>
+<blockquote>
+<div>raise Http404</div></blockquote>
+<p class="last">return result</p>
+</dd>
+<dt>def get_serializer(self, <a href="#id49"><span class="problematic" id="id50">*</span></a>args, <a href="#id51"><span class="problematic" id="id52">**</span></a>kwargs):</dt>
+<dd><p class="first">serializer_class = self.get_serializer_class()
+kwargs[‘context’] = self.get_serializer_context()
+if self.task:</p>
+<blockquote>
+<div>kwargs[‘task’] = self.task</div></blockquote>
+<dl class="docutils">
+<dt>else:</dt>
+<dd><dl class="first docutils">
+<dt>kwargs[‘task’] = self.get_queryset().distinct().get(</dt>
+<dd>pk=self.kwargs[‘pk’]</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">kwargs[‘shipment_num’] = self.kwargs[‘s_num’]
+kwargs[‘instance’] = args[0]
+return serializer_class(<a href="#id53"><span class="problematic" id="id54">**</span></a>kwargs)</p>
+</dd>
+<dt>def retrieve(self, request, <a href="#id55"><span class="problematic" id="id56">*</span></a>args, <a href="#id57"><span class="problematic" id="id58">**</span></a>kwargs):</dt>
+<dd><p class="first">instance = self.get_object()
+serializer = self.get_serializer(instance)
+result = serializer.data</p>
+<p>values = []</p>
+<dl class="docutils">
+<dt>for key, value in result.items():</dt>
+<dd><dl class="first last docutils">
+<dt>values.append({</dt>
+<dd>‘name’: key,
+‘label’: serializer.field_form_element[key].label,
+‘type’: serializer.field_form_element[key].get_type_display(),
+‘value’: value</dd>
+</dl>
+</dd>
+<dt>final_result = {</dt>
+<dd>‘is_completed’: not self.task.is_active,
+‘data’: values</dd>
+</dl>
+<p>}</p>
+<p class="last">return Response(final_result)</p>
+</dd>
+</dl>
+</dd>
+<dt>class FormRetrieveView(generics.RetrieveAPIView):</dt>
+<dd><p class="first">serializer_class = FormRetrieveSerializer</p>
+<dl class="last docutils">
+<dt>def __init__(self, <a href="#id59"><span class="problematic" id="id60">**</span></a>kwargs):</dt>
+<dd>super(FormRetrieveView, self).__init__(<a href="#id61"><span class="problematic" id="id62">**</span></a>kwargs)
+self.task = None</dd>
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>task = Task.objects.filter(</dt>
+<dd>form__isnull=False,
+triggered_at__isnull=False</dd>
+<dt>).filter(</dt>
+<dd><dl class="first docutils">
+<dt>Q(</dt>
+<dd>notify_stakeholders=self.request.user.stakeholder</dd>
+</dl>
+<p>) |
+Q(</p>
+<blockquote>
+<div>task_for=self.request.user.stakeholder</div></blockquote>
+<p>) |
+Q(</p>
+<blockquote>
+<div>secondary_stakeholders=self.request.user.stakeholder</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)
+return task</p>
+</dd>
+<dt>def get_object(self):</dt>
+<dd>self.task = self.get_queryset().distinct().get(pk=self.kwargs[‘pk’])
+return self.task.form</dd>
+<dt>def get_serializer_context(self):</dt>
+<dd>context = super(FormRetrieveView, self).get_serializer_context()
+context[‘task’] = self.task
+context[‘s_num’] = self.kwargs[‘s_num’]
+return context</dd>
+<dt>def retrieve(self, request, <a href="#id63"><span class="problematic" id="id64">*</span></a>args, <a href="#id65"><span class="problematic" id="id66">**</span></a>kwargs):</dt>
+<dd><p class="first">instance = self.get_object()
+serializer = self.get_serializer(instance)
+result = serializer.data</p>
+<p class="last"># task_serializer = TaskVariableSerializerModel(
+#     var_names=[‘container_nums’],  # &lt;–
+#     cp_booking_id=self.task.booking_id,
+#     stakeholder=request.user.stakeholder
+# )
+#
+# vars = task_serializer.data()
+#
+# titles = vars.setdefault(
+#     ‘container_nums’,
+#     {
+#         ‘values’: self.get_default_container_values()
+#     }
+# )
+#
+# result[‘shipment_details’] = self._get_is_filled(titles[‘values’])
+#
+# v = vars
+# result[‘’]
+return Response(result)</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskVariableAllRUDView(APIView):</dt>
+<dd><p class="first">def get(self, request, <a href="#id67"><span class="problematic" id="id68">*</span></a>args, <a href="#id69"><span class="problematic" id="id70">**</span></a>kwargs):</p>
+<blockquote class="last">
+<div><p>var_names_set = set()
+var_names_list_all = []
+var_names_list = []
+task_variables_all = TaskVariable.objects.filter(cp_booking_id=kwargs[‘booking_id’])</p>
+<p># check_type_vn = type(var_names_all)
+for task_variable in task_variables_all:</p>
+<blockquote>
+<div>var_names_list_all.append(task_variable.name)
+v = var_names_list_all</div></blockquote>
+<p># var_names_set.update(var_names_list_all)</p>
+<dl class="docutils">
+<dt>for var_names in var_names_list_all:</dt>
+<dd>var_names_set.add(var_names)
+vv = var_names_set</dd>
+<dt>for var_names in var_names_set:</dt>
+<dd>var_names_list.append(var_names)</dd>
+<dt>task_serializer = TaskVariableSerializerModel(</dt>
+<dd>var_names=var_names_list,
+cp_booking_id=kwargs[‘booking_id’],
+stakeholder=request.user.stakeholder</dd>
+</dl>
+<p>)</p>
+<p>return Response(task_serializer.data())</p>
+</div></blockquote>
+</dd>
+<dt>class TaskVariableRUDView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get(self, request, <a href="#id71"><span class="problematic" id="id72">*</span></a>args, <a href="#id73"><span class="problematic" id="id74">**</span></a>kwargs):</dt>
+<dd><dl class="first docutils">
+<dt>task_serializer = TaskVariableSerializerModel(</dt>
+<dd>var_names=self.request.query_params[‘var_names’].split(‘,’),
+cp_booking_id=kwargs[‘booking_id’],
+stakeholder=request.user.stakeholder</dd>
+</dl>
+<p>)</p>
+<p class="last">return Response(task_serializer.data())</p>
+</dd>
+</dl>
+</dd>
+<dt>class MarkCompletedView(APIView):</dt>
+<dd><p class="first">def get(self, request, <a href="#id75"><span class="problematic" id="id76">*</span></a>args, <a href="#id77"><span class="problematic" id="id78">**</span></a>kwargs):</p>
+<blockquote class="last">
+<div><p>task_id = kwargs[‘task_id’]</p>
+<p>task = Task.objects.get(pk=task_id)</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd>task.mark_as_completed()
+task_completed = True</dd>
+<dt>except:</dt>
+<dd>task_completed = False</dd>
+</dl>
+<p>tc = task_completed</p>
+<p>return Response(task_completed, status=status.HTTP_200_OK)</p>
+</div></blockquote>
+</dd>
+<dt>class ShipperLogTaskListView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_result(self, limit=10, offset=0):</dt>
+<dd><dl class="first docutils">
+<dt>query = “”“</dt>
+<dd><p class="first">SELECT s.shipment_num, s.container_num, t.id as task_id, t.task_name, max(f.created_at) as updated_at, c.cp_booking_number
+FROM task_formelementvalue f
+INNER JOIN shipment_shipment s</p>
+<blockquote>
+<div>ON s.id = f.shipment_id</div></blockquote>
+<dl class="docutils">
+<dt>INNER JOIN quote_quote q</dt>
+<dd>ON q.id = s.shipper_quote_id</dd>
+<dt>INNER JOIN booking_cpbooking c</dt>
+<dd>ON c.quote_id = q.id</dd>
+<dt>INNER JOIN task_formelement e</dt>
+<dd>ON e.id = f.form_element_id</dd>
+<dt>INNER JOIN task_form tf</dt>
+<dd>ON tf.id = e.form_id</dd>
+<dt>INNER JOIN task_task t</dt>
+<dd>ON t.form_id = tf.id AND t.booking_id = c.id</dd>
+<dt>WHERE</dt>
+<dd><dl class="first docutils">
+<dt>(</dt>
+<dd>q.stakeholder_id = ‘{stakeholder_id}’</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">GROUP BY t.id, s.id, c.cp_booking_number
+ORDER BY updated_at DESC
+LIMIT {limit}
+OFFSET {offset}</p>
+</dd>
+<dt>“”“.format(</dt>
+<dd>limit=limit,
+offset=offset,
+stakeholder_id=self.request.user.stakeholder.id</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>with connection.cursor() as cursor:</dt>
+<dd>cursor.execute(query)
+rows = cursor.fetchall()</dd>
+</dl>
+<p>result = []</p>
+<dl class="docutils">
+<dt>for row in rows:</dt>
+<dd><dl class="first docutils">
+<dt>result.append({</dt>
+<dd>‘shipment_num’: row[0],
+‘container_num’: row[1],
+‘task_id’: row[2],
+‘task_name’: row[3],
+‘updated_at’: row[4],
+‘booking_num’: row[5]</dd>
+</dl>
+<p class="last">})</p>
+</dd>
+</dl>
+<p class="last">return result</p>
+</dd>
+<dt>def get(self, request, <a href="#id79"><span class="problematic" id="id80">*</span></a>args, <a href="#id81"><span class="problematic" id="id82">**</span></a>kwargs):</dt>
+<dd><p class="first">page_num = int(request.query_params.get(‘page’, 1))</p>
+<p>offset = (page_num - 1) * 15
+limit = page_num * 15</p>
+<dl class="docutils">
+<dt>return Response(</dt>
+<dd><dl class="first docutils">
+<dt>self.get_result(</dt>
+<dd>limit=limit,
+offset=offset</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>class VendorLogTaskListView(APIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_result(self, limit=10, offset=0):</dt>
+<dd><dl class="first docutils">
+<dt>query = “”“</dt>
+<dd><p class="first">SELECT s.shipment_num, s.container_num, t.id as task_id, t.task_name, max(f.created_at) as updated_at, b.booking_number
+FROM task_formelementvalue f
+INNER JOIN shipment_shipment s</p>
+<blockquote>
+<div>ON s.id = f.shipment_id</div></blockquote>
+<dl class="docutils">
+<dt>INNER JOIN quote_quote q</dt>
+<dd>ON q.id = s.shipper_quote_id</dd>
+<dt>INNER JOIN booking_cpbooking c</dt>
+<dd>ON c.quote_id = q.id</dd>
+<dt>INNER JOIN task_formelement e</dt>
+<dd>ON e.id = f.form_element_id</dd>
+<dt>INNER JOIN task_form tf</dt>
+<dd>ON tf.id = e.form_id</dd>
+<dt>INNER JOIN task_task t</dt>
+<dd>ON t.form_id = tf.id AND t.booking_id = c.id</dd>
+<dt>INNER JOIN booking_booking b</dt>
+<dd>ON b.quote_id = q.id AND b.service_provider_id = ‘{stakeholder_id}’</dd>
+<dt>WHERE</dt>
+<dd><dl class="first docutils">
+<dt>(</dt>
+<dd>t.task_for_id = ‘{stakeholder_id}’</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">GROUP BY t.id, s.id, b.booking_number
+ORDER BY updated_at DESC
+LIMIT {limit}
+OFFSET {offset}</p>
+</dd>
+<dt>“”“.format(</dt>
+<dd>limit=limit,
+offset=offset,
+stakeholder_id=self.request.user.stakeholder.id</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>with connection.cursor() as cursor:</dt>
+<dd>cursor.execute(query)
+rows = cursor.fetchall()</dd>
+</dl>
+<p>result = []</p>
+<dl class="docutils">
+<dt>for row in rows:</dt>
+<dd><dl class="first docutils">
+<dt>result.append({</dt>
+<dd>‘shipment_num’: row[0],
+‘container_num’: row[1],
+‘task_id’: row[2],
+‘task_name’: row[3],
+‘updated_at’: row[4],
+‘booking_num’: row[5]</dd>
+</dl>
+<p class="last">})</p>
+</dd>
+</dl>
+<p class="last">return result</p>
+</dd>
+<dt>def get(self, request, <a href="#id83"><span class="problematic" id="id84">*</span></a>args, <a href="#id85"><span class="problematic" id="id86">**</span></a>kwargs):</dt>
+<dd><p class="first">page_num = int(request.query_params.get(‘page’, 1))</p>
+<p>offset = (page_num - 1) * 15
+limit = page_num * 15</p>
+<dl class="docutils">
+<dt>return Response(</dt>
+<dd><dl class="first docutils">
+<dt>self.get_result(</dt>
+<dd>limit=limit,
+offset=offset,</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="r-serializer.html"
+                        title="previous chapter">rates.serializer</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="t-model.html"
+                        title="next chapter">task.models</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/t-view.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="t-model.html" title="task.models"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="r-serializer.html" title="rates.serializer"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

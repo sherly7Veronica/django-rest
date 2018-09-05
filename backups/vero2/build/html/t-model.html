@@ -1,0 +1,1168 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>task.models &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="task.serializers" href="t-serializer.html" />
+    <link rel="prev" title="task.views" href="t-view.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="t-serializer.html" title="task.serializers"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="t-view.html" title="task.views"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="task-models">
+<h1>task.models<a class="headerlink" href="#task-models" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>import json
+import re
+import sys
+import time</p>
+<p>import dateutil.parser
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Q
+from django.utils import timezone</p>
+<p>from blockchain.helpers import create_new_transaction
+from events.models import Events
+from notification.models import Notification
+from quote.models import Leg
+from shipment.models import ShipmentBooking
+from stakeholder.models import Stakeholder
+# from task.views import TaskDataOptionsRetreiveView
+from utils.models import DateBaseModel</p>
+<dl class="docutils">
+<dt>class FormData:</dt>
+<dd><dl class="first docutils">
+<dt>def __init__(self, task, shipment_num, <a href="#id1"><span class="problematic" id="id2">**</span></a>kwargs):</dt>
+<dd>self.task = task
+self.shipment_num = shipment_num
+self.kwargs = kwargs
+self.form_elements_values = self._get_form_element_values()
+self._set_values()</dd>
+</dl>
+<p>def _get_form_element_values(self):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>fev = FormElementValue.objects.filter(</dt>
+<dd>task=self.task,
+shipment__shipment_num=self.shipment_num,
+shipment__shipper_quote=self.task.booking.quote</dd>
+</dl>
+<p>).distinct().order_by(‘form_element__order’)
+return fev</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>def get_form_elements(self):</dt>
+<dd><dl class="first docutils">
+<dt>return FormElement.objects.filter(</dt>
+<dd>form__task=self.task</dd>
+</dl>
+<p class="last">).order_by(‘form_element__order’)</p>
+</dd>
+</dl>
+<p>def _set_values(self):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>for element_value in self.form_elements_values:</dt>
+<dd>setattr(self, element_value.form_element.name, element_value.get_type_casted_value(self.task))</dd>
+</dl>
+</div></blockquote>
+<p>def save(self, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>for element_value in self.form_elements_values:</dt>
+<dd><p class="first">value = getattr(self, element_value.form_element.name, None)</p>
+<dl class="last docutils">
+<dt>if value:</dt>
+<dd>element_value.value = value
+element_value.save()</dd>
+</dl>
+</dd>
+</dl>
+<p>return self</p>
+</div></blockquote>
+<p>def update(self, <a href="#id5"><span class="problematic" id="id6">**</span></a>kwargs):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>for attr, value in kwargs:</dt>
+<dd>setattr(self, attr, value)</dd>
+</dl>
+<p>return self.save()</p>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def delete(self, <a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs):</dt>
+<dd><dl class="first docutils">
+<dt>for element_value in self.form_elements_values:</dt>
+<dd>element_value.delete()</dd>
+</dl>
+<p class="last">return self</p>
+</dd>
+</dl>
+</dd>
+<dt>class TaskBaseModel(DateBaseModel):</dt>
+<dd><p class="first">TASK_TYPE_ACK = 0
+TASK_TYPE_FORM = 1
+TASK_TYPE_INITIATOR = 2
+TASK_TYPE_FINAL = 4
+TASK_TYPE_BLOCKCHAIN = 3
+TASK_TYPE_PRECURSOR = -1</p>
+<dl class="docutils">
+<dt>TASK_TYPE_CHOICES = (</dt>
+<dd>(TASK_TYPE_PRECURSOR, ‘precursor’),
+(TASK_TYPE_ACK, ‘acknowledgement’),
+(TASK_TYPE_FORM, ‘form’),
+(TASK_TYPE_INITIATOR, ‘initiator’),
+(TASK_TYPE_BLOCKCHAIN, ‘blockchain’),
+(TASK_TYPE_FINAL, ‘final’)</dd>
+</dl>
+<p>)</p>
+<p>TASK_CATEGORY_NORMAL = 0
+TASK_CATEGORY_INITIATOR = 1
+TASK_CATEGORY_BLOCKCHAIN = 2
+TASK_CATEGORY_PRECURSOR = 3
+TASK_CATEGORY_FINAL = 4</p>
+<dl class="docutils">
+<dt>TASK_CATEGORY_CHOICES = (</dt>
+<dd>(TASK_CATEGORY_NORMAL, ‘normal’),
+(TASK_CATEGORY_INITIATOR, ‘initiator’),
+(TASK_CATEGORY_BLOCKCHAIN, ‘blockchain’),
+(TASK_CATEGORY_PRECURSOR, ‘precursor’),
+(TASK_CATEGORY_FINAL, ‘final’),</dd>
+</dl>
+<p>)</p>
+<p>TASK_TRIGGER_COMPLETED = 0
+TASK_TRIGGER_PARTIALLY_COMPLETED = 1
+TASK_TRIGGER_ESCALATED = 2
+TASK_TRIGGER_EXPIRED = 3</p>
+<dl class="docutils">
+<dt>TASK_TRIGGER_ON_CHOICES = (</dt>
+<dd>(TASK_TRIGGER_COMPLETED, ‘completed’),
+(TASK_TRIGGER_PARTIALLY_COMPLETED, ‘partially_completed’),
+(TASK_TRIGGER_ESCALATED, ‘escalated’),
+(TASK_TRIGGER_EXPIRED, ‘expired’),</dd>
+</dl>
+<p>)</p>
+<p>task_name = models.CharField(max_length=64)
+task_description = models.CharField(max_length=1024)
+# task_for =
+# notify_stakeholders =
+task_type = models.IntegerField(default=TASK_TYPE_ACK, choices=TASK_TYPE_CHOICES)
+form = models.ForeignKey(‘task.Form’, blank=True, null=True)
+trigger_tasks_on = models.IntegerField(default=TASK_TRIGGER_COMPLETED, choices=TASK_TRIGGER_ON_CHOICES)
+# is_active =
+# completed_at =
+# event =
+# trigger_tasks_on_completion =
+task_category = models.IntegerField(choices=TASK_CATEGORY_CHOICES, default=TASK_CATEGORY_NORMAL)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.task_name.encode(‘utf8’, ‘ignore’)</dd>
+<dt>class Meta:</dt>
+<dd>abstract = True</dd>
+</dl>
+</dd>
+<dt>class AbstractTask(TaskBaseModel):</dt>
+<dd><p class="first">task_for = models.TextField()
+expiry = models.BigIntegerField(blank=True, null=True)
+escalate_at = models.BigIntegerField(blank=True, null=True)
+estimated_completion_at = models.BigIntegerField()</p>
+<dl class="docutils">
+<dt>dependency_tasks = models.ManyToManyField(‘task.AbstractTask’, blank=True, null=True,</dt>
+<dd>related_name=’dependent_tasks’)</dd>
+<dt>trigger_tasks_on_completion = models.ManyToManyField(‘task.AbstractTask’, blank=True, null=True,</dt>
+<dd>related_name=’triggered_tasks’)</dd>
+</dl>
+<p>mode_type = models.ForeignKey(‘cp_eav.DynamicTable’, null=True, blank=True, related_name=’mode_abstract_task’)
+hub_type = models.ForeignKey(‘cp_eav.DynamicTable’, null=True, blank=True, related_name=’mode_abstract_hub’)
+is_incoming = models.NullBooleanField()</p>
+<p>is_display_field = models.BooleanField(default=False)
+display_name = models.CharField(unique=True, blank=True, null=True, max_length=64)</p>
+<p>notify_stakeholders = models.TextField()</p>
+<p>secondary_stakeholders = models.TextField(blank=True)</p>
+<p>notification_msg_short = models.CharField(max_length=120)
+notification_msg_long = models.TextField()
+notification_msg_title = models.CharField(max_length=120)</p>
+<p>initiator_task = models.NullBooleanField(blank=True, null=True, default=None)</p>
+<p>is_enabled = models.BooleanField(default=True)
+enabled = models.BooleanField(default=False)
+order_number = models.IntegerField(default=0)
+include_for_type = models.CharField(max_length=512, blank=True, null=True)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd><p class="first">mode = ‘’
+if self.mode_type:</p>
+<blockquote>
+<div>mode = self.mode_type.table_name</div></blockquote>
+<p>hub = ‘’
+if self.hub_type:</p>
+<blockquote>
+<div>hub = self.hub_type.table_name</div></blockquote>
+<dl class="last docutils">
+<dt>return ‘{} ({} – {} – incoming - {})’.format(self.task_name.encode(‘utf8’, ‘ignore’), hub,</dt>
+<dd>mode, self.is_incoming)</dd>
+</dl>
+</dd>
+<dt>def get_penalty_set(self):</dt>
+<dd>return self.penalty_set.all()</dd>
+</dl>
+</dd>
+</dl>
+<hr class="docutils" />
+<dl class="docutils">
+<dt>class Task(TaskBaseModel):</dt>
+<dd><p class="first">STAKEHOLDER_TYPE_SHIPPING_LINE = ‘Forwarder’
+STAKEHOLDER_TYPE_SHIPPER = ‘client’
+STAKEHOLDER_TYPE_TRUCKER = ‘Trucker’</p>
+<p>is_active = models.BooleanField(default=False)
+task_for = models.ForeignKey(Stakeholder, on_delete=models.CASCADE, blank=True, null=True)</p>
+<p>triggered_at = models.DateTimeField(blank=True, null=True)
+expiry = models.IntegerField(default=5000)
+escalation = models.IntegerField(default=4500)
+estimated_completion = models.IntegerField(default=4000)</p>
+<p>completed_at = models.DateTimeField(blank=True, null=True)</p>
+<p>partially_completed_at = models.DateTimeField(blank=True, null=True)</p>
+<p>escalated_at = models.DateTimeField(blank=True, null=True)
+expired_at = models.DateTimeField(blank=True, null=True)</p>
+<dl class="docutils">
+<dt>notify_stakeholders = models.ManyToManyField(Stakeholder, related_name=’notify_stakeholder_task’, blank=True,</dt>
+<dd>null=True)</dd>
+<dt>secondary_stakeholders = models.ManyToManyField(Stakeholder, related_name=’secondary_stakeholder_task’, blank=True,</dt>
+<dd>null=True)</dd>
+</dl>
+<p>notification_msg_short = models.CharField(max_length=120)
+notification_msg_long = models.TextField()
+notification_msg_title = models.CharField(max_length=120)</p>
+<p>booking = models.ForeignKey(‘booking.CPBooking’, blank=True, null=True)
+event = models.ForeignKey(Events, blank=True, null=True)
+trigger_tasks_on_completion = models.ManyToManyField(‘task.Task’, related_name=’task_triggered_by_task’, blank=True,</p>
+<blockquote>
+<div>null=True)</div></blockquote>
+<p>dependency_tasks = models.ManyToManyField(‘task.Task’, blank=True, null=True)</p>
+<p>abstract_task = models.ForeignKey(AbstractTask, blank=True, null=True)</p>
+<p>leg = models.ForeignKey(‘quote.Leg’, blank=True, null=True)
+order_number = models.IntegerField(default=0)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd><dl class="first last docutils">
+<dt>if self.task_name is not None:</dt>
+<dd>return ‘{}’.format(self.task_name.encode(‘utf8’, ‘ignore’))</dd>
+</dl>
+</dd>
+<dt>def create_blockchain(self, shipment):</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd><p class="first">container_no = shipment.container_num
+owner = self.task_for.id
+timestamp = time.time()
+quote = shipment.shipper_quote
+extra = {</p>
+<blockquote>
+<div>“quote_id”: quote.quote_number</div></blockquote>
+<p class="last">}
+create_new_transaction(container_no, owner, timestamp, extra)</p>
+</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+</dd>
+<dt>def make_quote_leg_active(self):</dt>
+<dd><p class="first"># mode_type = self.abstract_task.mode_type
+# hub_type = self.abstract_task.hub_type
+# is_incoming = self.abstract_task.is_incoming
+#
+# if not is_incoming:
+#     leg = Leg.objects.get(
+#         fromHub__dynamic_table=hub_type,
+#         mode__dynamic_table=mode_type
+#     )
+# else:
+#     leg = Leg.objects.get(
+#         toHub__dynamic_table=hub_type,
+#         mode__dynamic_table=mode_type
+#     )
+#
+# if not leg.is_active:
+#     leg.is_active = True
+#     leg.save()
+try:</p>
+<blockquote>
+<div><p>leg = self.leg
+if not leg.is_active:</p>
+<blockquote>
+<div>leg.is_active = True
+leg.save()</div></blockquote>
+</div></blockquote>
+<dl class="last docutils">
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+</dd>
+<dt>def make_quote_leg_inactive(self):</dt>
+<dd><p class="first"># mode_type = self.abstract_task.mode_type
+# hub_type = self.abstract_task.hub_type
+# is_incoming = self.abstract_task.is_incoming
+#
+# if not is_incoming:
+#     leg = Leg.objects.get(
+#         fromHub__dynamic_table=hub_type,
+#         mode__dynamic_table=mode_type
+#     )
+# else:
+#     leg = Leg.objects.get(
+#         toHub__dynamic_table=hub_type,
+#         mode__dynamic_table=mode_type
+#     )</p>
+<p># if not leg.is_active:
+#     leg.is_active = False
+#     leg.save()</p>
+<p># if not is_incoming:
+#     leg_other_part = {
+#         “other_mode_type”: mode_type,
+#         “other_hub_type”: leg.toHub.dynamic_table,
+#         “is_incoming”: True
+#     }
+# else:
+#     leg_other_part = {
+#         “other_mode_type”: mode_type,
+#         “other_hub_type”: leg.fromHub.dynamic_table,
+#         “is_incoming”: False
+#     }
+try:</p>
+<blockquote>
+<div><p>leg = self.leg
+cpbooking = self.booking</p>
+<p>tasks = Task.objects.filter(leg=leg, booking=cpbooking)
+all_leg_tasks_completed = True
+for task in tasks:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if task.completed_at:</dt>
+<dd>all_leg_tasks_completed = False</dd>
+</dl>
+</div></blockquote>
+<dl class="docutils">
+<dt>if all_leg_tasks_completed:</dt>
+<dd>leg.is_active = False
+leg.save()</dd>
+</dl>
+</div></blockquote>
+<dl class="last docutils">
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+</dd>
+<dt>def make_booking_active(self):</dt>
+<dd><p class="first"># shipment_booking = ShipmentBooking.objects.get(shipment=shipment)
+# booking = shipment_booking.vendor_booking
+#
+# if not booking.is_active:
+#     booking.is_active = True
+#     booking.save()
+try:</p>
+<blockquote>
+<div><p>quote = self.booking.quote
+leg = self.leg
+bookings = ContentType.objects.get(model=’booking’).model_class().objects.filter(quote=quote, legs=leg)
+for booking in bookings:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if not booking.is_active:</dt>
+<dd>booking.is_active = True
+booking.save()</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<dl class="last docutils">
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+</dd>
+<dt>def make_booking_inactive(self, shipment):</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd><p class="first">shipment_booking = ShipmentBooking.objects.get(shipment=shipment)
+booking = shipment_booking.vendor_booking
+booking_legs = booking.legs.all()
+cpbooking = self.booking
+tasks = Task.objects.filter(booking=cpbooking, leg__in=booking_legs)
+booking_shipments = ShipmentBooking.objects.filter(vendor_booking=booking)
+b_shipments = []
+for i in booking_shipments:</p>
+<blockquote>
+<div>b_shipments.append(i.shipment)</div></blockquote>
+<p>booking_tasks_completed = True
+for task in tasks:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if not task.get_task_booking_is_filled(booking, b_shipments):</dt>
+<dd>booking_tasks_completed = False
+break</dd>
+</dl>
+</div></blockquote>
+<dl class="last docutils">
+<dt>if booking_tasks_completed:</dt>
+<dd>booking.is_active = False
+booking.save()</dd>
+</dl>
+</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+</dd>
+</dl>
+<p>def get_task_booking_is_filled(self, booking, b_shipments):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if self.task_category == Task.TASK_CATEGORY_FINAL:</dt>
+<dd>return False</dd>
+</dl>
+<p>form = self.form
+form_elements = form.get_elements()
+required_count = 0
+form_element_r_list = []
+for form_element in form_elements:</p>
+<blockquote>
+<div><p>required = form_element.get_kwarg(‘required’)
+if required:</p>
+<blockquote>
+<div>required_count += 1
+form_element_r_list.append(form_element)</div></blockquote>
+</div></blockquote>
+<p>is_filled_count = 0
+# for i in range(1, (self.booking.quote.no_of_containers + 1)):
+#     shipment_num = i
+#
+#     # for form_element in form_element_r_list:
+#     is_filled = FormElementValue.objects.filter(
+#         shipment__shipment_num=shipment_num,
+#         # form_element__form=form,
+#         form_element__in=form_element_r_list,
+#         shipment__shipper_quote=self.booking.quote
+#     ).count() &gt;= required_count
+#     if is_filled:
+#         is_filled_count += 1
+#
+# if task_for_vendor:
+#     if is_filled_count == task_vendor_booking.num_assets:
+#         self.task.mark_as_completed()
+for shipment in b_shipments:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>is_filled = FormElementValue.objects.filter(</dt>
+<dd>shipment=shipment,
+form_element__in=form_element_r_list,
+task=self</dd>
+</dl>
+<p>).count() &gt;= required_count
+if is_filled:</p>
+<blockquote>
+<div>is_filled_count += 1</div></blockquote>
+</div></blockquote>
+<dl class="docutils">
+<dt>if is_filled_count == booking.num_assets:</dt>
+<dd>return True</dd>
+<dt>else:</dt>
+<dd>return False</dd>
+</dl>
+</div></blockquote>
+<p>def get_task_is_filled_percent(self):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if self.form:</dt>
+<dd><p class="first">form = self.form
+form_elements = form.get_elements()
+required_count = 0
+form_element_r_list = []
+for form_element in form_elements:</p>
+<blockquote>
+<div><p>required = form_element.get_kwarg(‘required’)
+if required:</p>
+<blockquote>
+<div>required_count += 1
+form_element_r_list.append(form_element)</div></blockquote>
+</div></blockquote>
+<p>is_filled_count = 0
+for i in range(1, (self.booking.quote.no_of_containers + 1)):</p>
+<blockquote>
+<div><p>shipment_num = i</p>
+<p># for form_element in form_element_r_list:
+is_filled = FormElementValue.objects.filter(</p>
+<blockquote>
+<div>shipment__shipment_num=shipment_num,
+# form_element__form=form,
+form_element__in=form_element_r_list,
+shipment__shipper_quote=self.booking.quote,
+task=self</div></blockquote>
+<p>).count() &gt;= required_count
+if is_filled:</p>
+<blockquote>
+<div>is_filled_count += 1</div></blockquote>
+</div></blockquote>
+<p class="last">total_containers = self.booking.quote.no_of_containers
+task_completed_percentage = round(((float(is_filled_count) / total_containers) * 100))
+# task.completed_percentage = task_completed_percentage
+return task_completed_percentage</p>
+</dd>
+<dt>else:</dt>
+<dd><dl class="first last docutils">
+<dt>if self.completed_at:</dt>
+<dd>return 100</dd>
+<dt>else:</dt>
+<dd>return 0</dd>
+</dl>
+</dd>
+</dl>
+</div></blockquote>
+<p>def mark_as_partially_completed(self):</p>
+<blockquote>
+<div><p>if self.trigger_tasks_on == Task.TASK_TRIGGER_PARTIALLY_COMPLETED:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>if not self.partially_completed_at:</dt>
+<dd><p class="first">self.partially_completed_at = timezone.now()
+self.save()
+for task in self.trigger_tasks_on_completion.all():</p>
+<blockquote class="last">
+<div>task.trigger_task()</div></blockquote>
+</dd>
+<dt>else:</dt>
+<dd>pass</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<dl class="last docutils">
+<dt>def mark_as_completed(self):</dt>
+<dd><p class="first"># if self.trigger_tasks_on == Task.TASK_TRIGGER_COMPLETED:
+#     self.completed_at = timezone.now()
+#     self.is_active = False
+#
+#     try:
+#         self.make_quote_leg_inactive()
+#     except:
+#         pass
+#     # self.make_booking_inactive()</p>
+<p>self.completed_at = timezone.now()
+self.is_active = False</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd>self.make_quote_leg_inactive()</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+<dt>if self.trigger_tasks_on == Task.TASK_TRIGGER_PARTIALLY_COMPLETED:</dt>
+<dd>self.partially_completed_at = timezone.now()</dd>
+<dt>if self.trigger_tasks_on == Task.TASK_TRIGGER_ESCALATED:</dt>
+<dd>self.escalated_at = timezone.now()</dd>
+<dt>if self.trigger_tasks_on == Task.TASK_TRIGGER_EXPIRED:</dt>
+<dd>self.expired_at = timezone.now()</dd>
+</dl>
+<p># if self.task_category == Task.TASK_CATEGORY_FINAL:
+#     try:
+#         self.booking.finish_booking()
+#         self.booking.quickbooks_final()
+#     except:
+#         pass</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first last docutils">
+<dt>for stakeholder in self.notify_stakeholders.all():</dt>
+<dd><p class="first">task_for = self.task_for.user.name
+Notification.objects.create(</p>
+<blockquote>
+<div>title=”{} Completed”.format(self.task_name),
+description=”Task Update: {} completed by {}”.format(self.task_name, self.task_for.user.name),
+stakeholder=stakeholder,</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+<p>self.save()</p>
+<dl class="docutils">
+<dt>for task in self.trigger_tasks_on_completion.all():</dt>
+<dd>task.trigger_task()</dd>
+</dl>
+<p># if not self.booking.task_set.filter(Q(completed_at__isnull=True) | Q(is_active=True)).exists():
+#     self.booking.finish_booking()
+else:</p>
+<blockquote class="last">
+<div>pass</div></blockquote>
+</dd>
+<dt>def trigger_task(self):</dt>
+<dd><p class="first"># for task in self.dependency_tasks.all():
+#     if task.is_active:
+#         return False</p>
+<dl class="docutils">
+<dt>if self.completed_at:</dt>
+<dd>return False</dd>
+<dt>for task in self.dependency_tasks.all():</dt>
+<dd><dl class="first last docutils">
+<dt>if task.trigger_tasks_on == Task.TASK_TRIGGER_COMPLETED and task.is_active:</dt>
+<dd>return False</dd>
+<dt>elif task.trigger_tasks_on == Task.TASK_TRIGGER_PARTIALLY_COMPLETED and not task.partially_completed_at:</dt>
+<dd>return False</dd>
+<dt>elif task.trigger_tasks_on == Task.TASK_TRIGGER_ESCALATED and not task.escalated_at:</dt>
+<dd>return False</dd>
+<dt>elif task.trigger_tasks_on == Task.TASK_TRIGGER_EXPIRED and not task.expired_at:</dt>
+<dd>return False</dd>
+</dl>
+</dd>
+</dl>
+<p>self.triggered_at = timezone.now()
+self.is_active = True
+self.save()</p>
+<dl class="docutils">
+<dt>try:</dt>
+<dd><dl class="first last docutils">
+<dt>if self.task_category == Task.TASK_CATEGORY_NORMAL:</dt>
+<dd>self.make_quote_leg_active()
+self.make_booking_active()
+# elif self.task_category == Task.TASK_CATEGORY_FINAL:
+#     task_cpbooking = self.booking
+#     task_cpbooking.finish_booking()
+#     task_cpbooking.quickbooks_final()</dd>
+</dl>
+</dd>
+<dt>except:</dt>
+<dd>pass</dd>
+</dl>
+<p class="last">return True</p>
+</dd>
+<dt>def get_form_data_instance(self, shipment_num):</dt>
+<dd><dl class="first docutils">
+<dt>fd = FormData(</dt>
+<dd>task=self,
+shipment_num=shipment_num</dd>
+</dl>
+<p class="last">)
+return fd</p>
+</dd>
+<dt>def get_form_element_by_name(self, name):</dt>
+<dd>return self.form.formelement_set.get(name=name)</dd>
+<dt>def send_notification(self):</dt>
+<dd><dl class="first last docutils">
+<dt>for stakeholder in self.notify_stakeholders.all():</dt>
+<dd><dl class="first docutils">
+<dt>Notification.objects.create(</dt>
+<dd>title=self.notification_msg_title,
+message_long=self.notification_msg_long,
+message_short=self.notification_msg_short,
+stakeholder=stakeholder</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+</dd>
+<dt>def get_variables(self):</dt>
+<dd>return TaskVariable.objects.filter(cp_booking=self.booking)</dd>
+<dt>def get_total_shipment(self):</dt>
+<dd>return self.leg.quote.no_of_containers</dd>
+<dt>def get_shipment_is_filled(self):</dt>
+<dd>form = self.form
+# TaskDataOptionsRetreiveView.retrieve()</dd>
+<dt>def get_escalation_datetime(self):</dt>
+<dd><dl class="first docutils">
+<dt>if self.triggered_at:</dt>
+<dd>return self.triggered_at + timezone.timedelta(minutes=self.escalation)</dd>
+</dl>
+<p class="last">return None</p>
+</dd>
+<dt>def get_expiry_datetime(self):</dt>
+<dd><dl class="first docutils">
+<dt>if self.triggered_at:</dt>
+<dd>return self.triggered_at + timezone.timedelta(minutes=self.expiry)</dd>
+</dl>
+<p class="last">return None</p>
+</dd>
+<dt>def is_task_for_vendor(self):</dt>
+<dd><dl class="first last docutils">
+<dt>return self.task_for.dynamic_table.table_name in [Task.STAKEHOLDER_TYPE_SHIPPING_LINE,</dt>
+<dd>Task.STAKEHOLDER_TYPE_TRUCKER]</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>class Form(DateBaseModel):</dt>
+<dd><p class="first">name = models.CharField(max_length=50)
+description = models.TextField()</p>
+<dl class="last docutils">
+<dt>def get_elements(self):</dt>
+<dd>return self.formelement_set.all()</dd>
+<dt>def __str__(self):</dt>
+<dd>return self.name.encode(‘utf8’, ‘ignore’)</dd>
+</dl>
+</dd>
+<dt>class FormElement(DateBaseModel):</dt>
+<dd><p class="first">‘’’
+self.kwargs =&gt; all the constraints on the field</p>
+<dl class="docutils">
+<dt>currently handling:</dt>
+<dd><dl class="first last docutils">
+<dt>mandatory_properties:</dt>
+<dd>‘required’: boolean,</dd>
+<dt>optional_properties:</dt>
+<dd>‘max_length’: if type is one of text
+‘choices’: json array of <em>choice_object</em>  -  if type is choice
+‘file_type’: a <em>file_type</em> object  -  if type is file</dd>
+<dt>potential_properties:</dt>
+<dd>‘validators’: a list of <em>validator_name</em></dd>
+</dl>
+</dd>
+<dt>glossary:</dt>
+<dd><p class="first">‘validator_name’: should have a corresponding a staticmethod named validate_&lt;validator_name&gt;
+‘choice_object: {‘&lt;value&gt;’: ‘&lt;display_name&gt;’}
+‘file_type’: {‘&lt;value&gt;’: ‘&lt;display_name&gt;’}</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>where pairs are one of:</dt>
+<dd>0 - PDF
+1 - CSV
+2 - Image</dd>
+</dl>
+</div></blockquote>
+</dd>
+</dl>
+<p>‘’’
+TYPE_CHOICE_TEXT = 0
+TYPE_CHOICE_DECIMAL = 1
+TYPE_CHOICE_CHOICE = 2
+TYPE_CHOICE_LAT_LNG = 3
+TYPE_CHOICE_FILE = 4
+TYPE_CHOICE_CHECKBOX = 5
+TYPE_CHOICE_DATETIME = 6
+TYPE_CHOICE_INTEGER = 7</p>
+<dl class="docutils">
+<dt>TYPE_CHOICES = (</dt>
+<dd>(TYPE_CHOICE_TEXT, ‘string’),
+(TYPE_CHOICE_DECIMAL, ‘decimal’),
+(TYPE_CHOICE_CHOICE, ‘choice’),
+(TYPE_CHOICE_LAT_LNG, ‘location’),
+(TYPE_CHOICE_FILE, ‘file_upload’),  # &#64;TODO: add validator
+(TYPE_CHOICE_CHECKBOX, ‘boolean’),
+(TYPE_CHOICE_DATETIME, ‘datetime’),
+(TYPE_CHOICE_INTEGER, ‘integer’)</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>KWARG_DEFAULTS = {</dt>
+<dd>‘required’: False,
+‘choices’: [],
+‘max_length’: 32,
+‘max_value’: sys.maxint,
+‘min_value’: -sys.maxint - 1,
+‘validators’: [],
+‘max_digits’: 22,
+‘decimal_places’: 18</dd>
+</dl>
+<p>}</p>
+<p>type = models.IntegerField(choices=TYPE_CHOICES, default=TYPE_CHOICE_TEXT)
+css_class = models.CharField(max_length=50, default=’‘)
+label = models.CharField(max_length=70)
+placeholder = models.CharField(max_length=70, default=’‘, blank=True, null=True)
+name = models.CharField(max_length=70)
+kwargs = models.TextField(blank=True, null=True)
+# required = models.BooleanField(default=False)
+# choices = models.TextField(blank=True)
+# file_type = models.CommaSeparatedIntegerField(choices=FILE_TYPE_CHOICES, max_length=1024, null=True, blank=True)
+form = models.ForeignKey(Form)
+default = models.TextField(blank=True, null=True)
+order = models.PositiveIntegerField(default=0)
+assign_to_var = models.CharField(max_length=32, blank=True, null=True)
+is_autofill = models.BooleanField(default=True)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.label.encode(‘utf8’, ‘ignore’)</dd>
+</dl>
+<p># is_editable = models.BooleanField(default=True)</p>
+<p># assign_to_variable = models.ForeignKey(TaskVariable)</p>
+<dl class="docutils">
+<dt>def get_default_value(self, shipment_num, task):</dt>
+<dd><dl class="first docutils">
+<dt>val = TaskVariable.replace_with_variable_value(</dt>
+<dd>text=self.default,
+cp_booking=task.booking,
+shipment_num=shipment_num,
+task=task</dd>
+</dl>
+<p class="last">)
+return None if val == ‘’ else val</p>
+</dd>
+<dt>def get_choice_list(self):</dt>
+<dd><p class="first">k = self.get_kwarg(‘choices’)
+return k</p>
+<p class="last"># return [(key, value) for key, value in self.get_kwarg(‘choices’).iteritems()]</p>
+</dd>
+<dt>def get_kwargs_dict(self):</dt>
+<dd><dl class="first docutils">
+<dt>if self.kwargs:</dt>
+<dd>return json.loads(self.kwargs)</dd>
+</dl>
+<p class="last">return FormElement.KWARG_DEFAULTS</p>
+</dd>
+<dt>def get_kwarg(self, key):</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd>return json.loads(self.kwargs)[key]</dd>
+<dt>except Exception as exc:</dt>
+<dd><dl class="first docutils">
+<dt>if key in FormElement.KWARG_DEFAULTS:</dt>
+<dd>return FormElement.KWARG_DEFAULTS[key]</dd>
+</dl>
+<p>my_exc = Exception()
+if isinstance(exc, ValueError):</p>
+<blockquote>
+<div>my_exc.message = ‘No kwargs in form_element’</div></blockquote>
+<dl class="docutils">
+<dt>if isinstance(exc, IndexError):</dt>
+<dd>my_exc.message = ‘No such key in kwargs’</dd>
+</dl>
+<p class="last">raise my_exc</p>
+</dd>
+</dl>
+</dd>
+<dt>def get_validators(self):</dt>
+<dd><p class="first">result = []</p>
+<p>validators = self.get_kwarg(‘validators’)</p>
+<dl class="docutils">
+<dt>for validator in validators:</dt>
+<dd><p class="first">validator_method = getattr(FormElement, “validate_{}”.format(validator), None)
+if validator_method:</p>
+<blockquote class="last">
+<div>result.append(validator_method)</div></blockquote>
+</dd>
+</dl>
+<p>default_validator = getattr(FormElement, “validate_{}”.format(self.get_type_display()), None)
+if default_validator:</p>
+<blockquote>
+<div>result.append(default_validator)</div></blockquote>
+<p class="last">return result</p>
+</dd>
+</dl>
+<p>&#64;staticmethod
+def validate_container_number(value):</p>
+<blockquote>
+<div><p>first10 = value[0:-1]
+check = value[-1]
+char2num = {</p>
+<blockquote>
+<div>‘0’: 0, ‘1’: 1, ‘2’: 2, ‘3’: 3, ‘4’: 4, ‘5’: 5, ‘6’: 6, ‘7’: 7, ‘8’: 8,
+‘9’: 9, ‘A’: 10, ‘B’: 12, ‘C’: 13, ‘D’: 14, ‘E’: 15, ‘F’: 16, ‘G’: 17,
+‘H’: 18, ‘I’: 19, ‘J’: 20, ‘K’: 21, ‘L’: 23, ‘M’: 24, ‘N’: 25, ‘O’: 26,
+‘P’: 27, ‘Q’: 28, ‘R’: 29, ‘S’: 30, ‘T’: 31, ‘U’: 32, ‘V’: 34, ‘W’: 35,
+‘X’: 36, ‘Y’: 37, ‘Z’: 38,</div></blockquote>
+<p>}
+total = sum(char2num[c] * 2 ** x for x, c in enumerate(first10))
+if not ((total % 11) % 10 == char2num[check]):</p>
+<blockquote>
+<div>raise ValidationError(‘Not a valid container number’)</div></blockquote>
+</div></blockquote>
+<p># This is how a validator method should look like
+&#64;staticmethod
+def validate_location(value):</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>try:</dt>
+<dd><p class="first">lat_lng = json.loads(value)</p>
+<dl class="last docutils">
+<dt>if len(lat_lng) != 2:</dt>
+<dd>raise ValidationError(‘Json list should have exactly 2 floats’)</dd>
+<dt>if type(lat_lng[0]) is not float or type(lat_lng[1]) is not float:</dt>
+<dd>raise ValidationError(‘Json list should have exactly 2 floats’)</dd>
+</dl>
+</dd>
+<dt>except ValueError:</dt>
+<dd>raise ValidationError(‘Not a json list’)</dd>
+</dl>
+</div></blockquote>
+<p>&#64;staticmethod
+def validate_unique_value(value):</p>
+<blockquote class="last">
+<div>pass</div></blockquote>
+</dd>
+</dl>
+<p># def index_validator():
+#     if not TaskVariable.is_indiced and TaskVariable.index:
+#         raise ValidationError(‘is_indiced set is to false’)</p>
+<dl class="docutils">
+<dt>def task_upload_file_location(instance, filename):</dt>
+<dd>return ‘task_docs/{}/{}’.format(str(instance.id), filename)</dd>
+<dt>class FileFormElementValue(DateBaseModel):</dt>
+<dd>form_element_value = models.OneToOneField(‘task.FormElementValue’, blank=True, null=True)
+doc = models.FileField(blank=True, null=True, upload_to=task_upload_file_location)</dd>
+<dt>class FormElementValue(DateBaseModel):</dt>
+<dd><p class="first">value = models.TextField(blank=True, null=True)
+shipment = models.ForeignKey(‘shipment.Shipment’)
+form_element = models.ForeignKey(FormElement)
+task = models.ForeignKey(‘task.Task’)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.value.encode(‘utf8’, ‘ignore’)</dd>
+<dt>class Meta:</dt>
+<dd>unique_together = (‘shipment’, ‘form_element’, ‘task’)</dd>
+<dt>def get_type_casted_value(self, task):</dt>
+<dd><p class="first">type = self.form_element.get_type_display()
+raw_value = getattr(self, ‘get_value_{}’.format(type))</p>
+<dl class="docutils">
+<dt>return TaskVariable.replace_with_variable_value(</dt>
+<dd>text=raw_value,
+cp_booking=self.shipment.shipper_quote.cpbooking,
+shipment_num=self.shipment.shipment_num,
+task=task</dd>
+</dl>
+<p class="last">)</p>
+</dd>
+</dl>
+<p>&#64;property
+def get_value_choice(self):</p>
+<blockquote>
+<div>return self.value</div></blockquote>
+<p>&#64;property
+def get_value_string(self):</p>
+<blockquote>
+<div>return self.value</div></blockquote>
+<p>&#64;property
+def get_value_decimal(self):</p>
+<blockquote>
+<div>return self.value</div></blockquote>
+<p>&#64;property
+def get_value_location(self):</p>
+<blockquote>
+<div>lat_lng = json.loads(self.value)
+return float(lat_lng[0]), float(lat_lng[1])</div></blockquote>
+<p>&#64;property
+def get_value_file_upload(self):</p>
+<blockquote>
+<div>return self.fileformelementvalue.doc</div></blockquote>
+<p>&#64;property
+def get_value_boolean(self):</p>
+<blockquote>
+<div>return bool(self.value)</div></blockquote>
+<p>&#64;property
+def get_value_datetime(self):</p>
+<blockquote>
+<div>return dateutil.parser.parse(self.value)</div></blockquote>
+<p>&#64;property
+def get_value_integer(self):</p>
+<blockquote class="last">
+<div>return int(self.value)</div></blockquote>
+</dd>
+<dt>class TaskVariable(DateBaseModel):</dt>
+<dd><p class="first">TYPE_INDEX_NONE = 0
+TYPE_INDEX_VENDOR = 1
+TYPE_INDEX_ALL = 2</p>
+<dl class="docutils">
+<dt>TYPE_INDEX_CHOICES = (</dt>
+<dd>(TYPE_INDEX_NONE, ‘none’),
+(TYPE_INDEX_VENDOR, ‘vendor’),
+(TYPE_INDEX_ALL, ‘all’)</dd>
+</dl>
+<p>)</p>
+<p>name = models.CharField(max_length=120)
+display_name = models.CharField(max_length=120)
+index_type = models.IntegerField(choices=TYPE_INDEX_CHOICES, default=TYPE_INDEX_NONE)
+value = models.CharField(max_length=1024, blank=True, null=True)
+index = models.IntegerField(default=0)
+cp_booking = models.ForeignKey(‘booking.CPBooking’)</p>
+<dl class="docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.name.encode(‘utf8’, ‘ignore’)</dd>
+</dl>
+<p>&#64;staticmethod
+def variable_to_value(variable_name, cp_booking, shipment_num, task):</p>
+<blockquote>
+<div><p>form = task.form</p>
+<dl class="docutils">
+<dt>qs = TaskVariable.objects.filter(</dt>
+<dd>cp_booking=cp_booking,
+name=variable_name.replace(‘[i]’, ‘’).replace(‘[v]’, ‘’)</dd>
+</dl>
+<p>)</p>
+<dl class="docutils">
+<dt>if ‘[i]’ in variable_name:</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd>return qs.get(index_type=TaskVariable.TYPE_INDEX_ALL, index=shipment_num).value</dd>
+<dt>except TaskVariable.DoesNotExist:</dt>
+<dd><p class="first">qs = qs.filter(index_type=TaskVariable.TYPE_INDEX_ALL).order_by(‘-created_at’)
+if qs.count() &gt; 0:</p>
+<blockquote>
+<div>return qs.first().value</div></blockquote>
+<dl class="last docutils">
+<dt>else:</dt>
+<dd>return “”</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt>elif ‘[v]’ in variable_name:</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd>booking = task.leg.leg_booking.get(shipmentbooking__shipment__shipment_num=shipment_num)
+v = qs.get(index_type=TaskVariable.TYPE_INDEX_VENDOR, index=booking.booking_index).value
+return v</dd>
+<dt>except TaskVariable.DoesNotExist:</dt>
+<dd>return “”</dd>
+</dl>
+</dd>
+<dt>else:</dt>
+<dd><dl class="first last docutils">
+<dt>try:</dt>
+<dd>return qs.get(index_type=TaskVariable.TYPE_INDEX_NONE).value</dd>
+<dt>except TaskVariable.DoesNotExist:</dt>
+<dd>return “”</dd>
+</dl>
+</dd>
+</dl>
+</div></blockquote>
+<p>&#64;staticmethod
+def replace_with_variable_value(text, cp_booking, shipment_num, task):</p>
+<blockquote class="last">
+<div><p>matches = re.findall(‘&lt;%(.*?)%&gt;’, str(text), re.DOTALL)
+for var in matches:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>value = TaskVariable.variable_to_value(</dt>
+<dd>variable_name=var,
+cp_booking=cp_booking,
+shipment_num=shipment_num,
+task=task</dd>
+</dl>
+<p>)
+text = text.replace(</p>
+<blockquote>
+<div>“&lt;%{}%&gt;”.format(var),
+value</div></blockquote>
+<p>)</p>
+</div></blockquote>
+<p>return text</p>
+</div></blockquote>
+</dd>
+<dt>class TaskAcknowledgement(DateBaseModel):</dt>
+<dd><p class="first">name = models.CharField(max_length=64)
+shipment = models.ForeignKey(‘shipment.Shipment’)
+description = models.CharField(max_length=1024)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.name.encode(‘utf8’, ‘ignore’)</dd>
+</dl>
+</dd>
+<dt>class TaskFormData(DateBaseModel):</dt>
+<dd><p class="first">task = models.ForeignKey(Task)
+shipment = models.ForeignKey(‘shipment.Shipment’)
+data = models.TextField()</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.task.task_name</dd>
+</dl>
+</dd>
+<dt>class FileUploads(DateBaseModel):</dt>
+<dd><p class="first">file_number = models.PositiveIntegerField()
+shipment = models.ForeignKey(‘shipment.Shipment’)
+file = models.FileField()</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.file_number</dd>
+</dl>
+</dd>
+<dt>class TaskFiles(DateBaseModel):</dt>
+<dd><p class="first">files = models.ManyToManyField(FileUploads)
+shipment = models.ForeignKey(‘shipment.Shipment’)
+task = models.ForeignKey(Task)</p>
+<dl class="last docutils">
+<dt>def __str__(self):</dt>
+<dd>return self.task.task_name</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="t-view.html"
+                        title="previous chapter">task.views</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="t-serializer.html"
+                        title="next chapter">task.serializers</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/t-model.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="t-serializer.html" title="task.serializers"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="t-view.html" title="task.views"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

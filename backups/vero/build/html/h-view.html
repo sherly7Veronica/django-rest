@@ -1,0 +1,282 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>hubs.views &#8212; api  documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="hubs.models" href="h-model.html" />
+    <link rel="prev" title="assets.serializers" href="a-serializer.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="h-model.html" title="hubs.models"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="a-serializer.html" title="assets.serializers"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" accesskey="U">Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hubs-views">
+<h1>hubs.views<a class="headerlink" href="#hubs-views" title="Permalink to this headline">¶</a></h1>
+<p># -<em>- coding: utf-8 -</em>-
+from __future__ import unicode_literals</p>
+<p>from cities_light.models import Country
+from django.db.models import Q
+from django_filters.rest_framework import DjangoFilterBackend
+# Create your views here.
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated</p>
+<p>from cp_eav.generic_model_serializer import serializer_factory
+from hubs.models import Hubs
+from hubs.serializer import HubsSerializer, HubsAutoCompleteSerializer, CitiesLightCountrySerializer
+from utils.metadata import CPMeta
+from utils.pagination import CamelportPagination</p>
+<dl class="docutils">
+<dt>class HubsListCreateAPIView(generics.ListCreateAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta
+filter_backends = (DjangoFilterBackend,)</p>
+<dl class="docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Hubs.objects.all()</dd>
+</dl>
+<p class="last">serializer_class = HubsSerializer</p>
+</dd>
+<dt>class HubsRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><p class="first">serializer_class = HubsSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Hubs.objects.all()</dd>
+</dl>
+</dd>
+<dt>class HubsDynamicValueRUDView(generics.RetrieveUpdateDestroyAPIView):</dt>
+<dd><dl class="first last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>qs = Hubs.objects.all()
+return qs</dd>
+<dt>def get_serializer(self, <a href="#id1"><span class="problematic" id="id2">*</span></a>args, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs):</dt>
+<dd><p class="first">dynamic_table = self.get_object().dynamic_table</p>
+<dl class="docutils">
+<dt>ser = serializer_factory(</dt>
+<dd>mdl=Hubs,
+fields=Hubs.get_fields_list(),
+dyn_table=dynamic_table,</dd>
+</dl>
+<p class="last">)
+return ser(<a href="#id5"><span class="problematic" id="id6">*</span></a>args, <a href="#id7"><span class="problematic" id="id8">**</span></a>kwargs)</p>
+</dd>
+</dl>
+</dd>
+<dt>class HubsAutoCompleteListView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = CamelportPagination
+metadata_class = CPMeta
+serializer_class = HubsAutoCompleteSerializer
+permission_classes = [IsAuthenticated, ]</p>
+<p>def get_queryset(self):</p>
+<blockquote>
+<div><p>search_text = self.request.query_params.get(‘search’)</p>
+<dl class="docutils">
+<dt>if search_text == ‘%’:</dt>
+<dd>return Hubs.objects.filter(stakeholder=self.request.user.stakeholder)</dd>
+</dl>
+<p>query = self.get_query(search_text.split(” “), ‘AND’, self.request.user.stakeholder.id)</p>
+<p>query_set = Hubs.objects.raw(query)</p>
+<p>result = list(query_set)</p>
+<dl class="docutils">
+<dt>if len(result) == 0:</dt>
+<dd><p class="first">query = self.get_query(search_text.split(” “), ‘OR’, self.request.user.stakeholder.id)</p>
+<p>query_set = Hubs.objects.raw(query)</p>
+<p class="last">result = list(query_set)</p>
+</dd>
+</dl>
+<p>return result</p>
+</div></blockquote>
+<p>def get_query(self, texts, appender, stakeholder_id):</p>
+<blockquote class="last">
+<div><dl class="docutils">
+<dt>lexeme_search = “”“to_tsquery(‘simple’, (</dt>
+<dd><blockquote class="first">
+<div>SELECT string_agg(word, ‘|’)
+FROM hub_unique_lexeme
+WHERE similarity(word, ‘{text}’)&gt; 0.25)</div></blockquote>
+<p class="last">)”“”</p>
+</dd>
+</dl>
+<p>search_condition_boiler_plate = “”“{amp} document &#64;&#64; {lexeme_search}”“”</p>
+<dl class="docutils">
+<dt>order_by_boilder_plate = “”“{comma} ts_rank(document, to_tsquery(‘simple’, (</dt>
+<dd>SELECT string_agg(word, ‘|’)
+FROM hub_unique_lexeme
+WHERE similarity(word, ‘{text}’)&gt; 0.25))
+)”“”</dd>
+</dl>
+<p>order_by = search_condition = ‘’</p>
+<dl class="docutils">
+<dt>for index, text in enumerate(texts):</dt>
+<dd><dl class="first docutils">
+<dt>if index == 0:</dt>
+<dd>amp = ‘’
+comma = ‘’</dd>
+<dt>else:</dt>
+<dd>amp = appender
+comma = ‘, ‘</dd>
+</dl>
+<p>text = text.replace(“’”, “’‘”)</p>
+<dl class="docutils">
+<dt>search_condition = search_condition + search_condition_boiler_plate.format(</dt>
+<dd>lexeme_search=lexeme_search.format(text=text),
+amp=amp</dd>
+</dl>
+<p>)</p>
+<p class="last">order_by = order_by + order_by_boilder_plate.format(text=text, comma=comma)</p>
+</dd>
+<dt>return “”“SELECT</dt>
+<dd><blockquote class="first">
+<div>id, name</div></blockquote>
+<p>FROM hub_search_index
+WHERE (stakeholder_id IS NULL OR stakeholder_id=’{stakeholder_id}’) AND {condition}
+ORDER BY {order_by}
+DESC LIMIT 10;”“”.format(condition=search_condition, order_by=order_by,</p>
+<blockquote class="last">
+<div>stakeholder_id=stakeholder_id)</div></blockquote>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+<dt>class StakeholderHubListView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = None
+serializer_class = HubsSerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Hubs.objects.filter(stakeholder__user=self.request.user)</dd>
+</dl>
+</dd>
+<dt>class CountryListView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = None
+serializer_class = CitiesLightCountrySerializer</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd>return Country.objects.all().order_by(‘name’)</dd>
+</dl>
+</dd>
+<dt>class ActiveHubListView(generics.ListAPIView):</dt>
+<dd><p class="first">pagination_class = None
+serializer_class = HubsSerializer
+permission_classes = [IsAuthenticated, ]</p>
+<dl class="last docutils">
+<dt>def get_queryset(self):</dt>
+<dd><dl class="first docutils">
+<dt>return Hubs.objects.filter(</dt>
+<dd><dl class="first docutils">
+<dt>Q(</dt>
+<dd>from_hub_leg__quote__cpbooking__isnull=False,
+from_hub_leg__quote__cpbooking__is_completed=False,
+from_hub_leg__quote__cpbooking__is_active=True,
+from_hub_leg__quote__cpbooking__is_cancelled=False,
+from_hub_leg__quote__stakeholder=self.request.user.stakeholder</dd>
+</dl>
+<p>) |
+Q(</p>
+<blockquote>
+<div>to_hub_leg__quote__cpbooking__isnull=False,
+to_hub_leg__quote__cpbooking__is_completed=False,
+to_hub_leg__quote__cpbooking__is_active=True,
+to_hub_leg__quote__cpbooking__is_cancelled=False,
+to_hub_leg__quote__stakeholder=self.request.user.stakeholder</div></blockquote>
+<p class="last">)</p>
+</dd>
+</dl>
+<p class="last">).distinct()</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="a-serializer.html"
+                        title="previous chapter">assets.serializers</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="h-model.html"
+                        title="next chapter">hubs.models</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/h-view.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="h-model.html" title="hubs.models"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="a-serializer.html" title="assets.serializers"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">api  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="stakeholder.html" >Stakeholder</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Veronica.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>
