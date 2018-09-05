@@ -1,0 +1,43 @@
+Container Tracking
+==================
+
+    This view is to track the container.
+
+    The major concerns of the shippers are:
+
+        1. Where is it currently?
+        2. When will it reach the customer?
+        3. How long has it been since it left the shipper?
+
+    The solution is **Tracking** which is also known as *Track* and *Trace*.
+
+    **What is Tracking?**
+
+    - ``Tracking`` is a process where the movement of the cargo is monitored.
+
+    **Container Tracking system:**
+
+    - ``Container Tracking`` is a necessity more than anything. ``Container Tracking`` systems allows you to know where your cargo is. You can Track anytime the current location of the ``Container``.
+
+    - With advancement in technology, now it has become possible to know the exact location of the ``Container``. The main idea is to always stay in touch with the ``Container``.
+
+    **How does Tracking work?**
+
+    - All you need to do is visit the website, supply the **Container number** and you can be able to view that Container's exact location.
+
+    - You can also get alerts through Email.
+
+
+    **What is a Container number?**
+
+    - One way to track a ``Container`` is using the **Container number**. A **Container number** is composed of four letters(container prefix) which is the owner code followed by six digits serial number and a check digit.
+
+    .. note:: Example: ABCD1234567
+
+    **Types of Tracking system:**
+
+    - Most of the cargo ``Container Tracking`` is carried out by remote satellite systems which pull up the satellite images of a ``Container`` at any time. These images are relayed back to the base station. This is a simple system of ship ``Container Tracking`` through satellite access which is easy and available everywhere.
+
+    - Another mode of ``Tracking`` is GPS Tracking system which is available in most vehicles.
+
+   
